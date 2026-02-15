@@ -141,91 +141,6 @@ app.post("/captcha", async (req, res) => {
     }
 });
 
-// app.post("/captcha", async (req, res) => {
-//     const { regNo } = req.body;
-//     if (!regNo) return res.status(400).json({ success: false, message: "RegNo required" });
-
-//     // 1. Cleanup old sessions
-//     if (pendingCaptcha[regNo]) {
-//         await pendingCaptcha[regNo].context.close().catch(() => {});
-//     }
-
-//     const context = await browser.newContext();
-//     const page = await context.newPage();
-//     let captchaFound = false;
-
-//     try {
-//         // 2. Optimization: Block heavy resources
-//         await page.route('**/*', route => {
-//             const req = route.request();
-//             if (req.resourceType() === 'document' || req.url().includes('Captcha')) {
-//                 route.continue();
-//             } else {
-//                 route.abort(); 
-//             }
-//         });
-
-//         // 3. Intercept the Captcha Request
-//         page.on('response', async (response) => {
-//             const url = response.url();
-//             if (url.includes('Captcha') && response.status() === 200) {
-//                 try {
-//                     const buffer = await response.body();
-//                     captchaFound = true;
-                    
-//                     // Convert Buffer to Base64 String
-//                     const base64Image = buffer.toString('base64');
-
-//                     // Store session
-//                     pendingCaptcha[regNo] = { context, page, timestamp: Date.now() };
-
-//                     // Send JSON Response
-//                     res.json({ 
-//                         success: true, 
-//                         image: `data:image/jpeg;base64,${base64Image}` 
-//                     });
-                    
-//                 } catch (e) {
-//                     console.error("Buffer read error");
-//                 }
-//             }
-//         });
-
-//         // 4. Navigate
-//         await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 5000 });
-        
-//         // 5. Fallback (If interception misses)
-//         setTimeout(async () => {
-//             if (!captchaFound && !res.headersSent) {
-//                 try {
-//                     // Fallback to screenshot only if absolutely necessary
-//                     const buffer = await page.locator('#imgCaptcha').screenshot();
-//                     const base64Image = buffer.toString('base64');
-
-//                     pendingCaptcha[regNo] = { context, page, timestamp: Date.now() };
-                    
-//                     res.json({ 
-//                         success: true, 
-//                         image: `data:image/png;base64,${base64Image}` 
-//                     });
-
-//                 } catch (e) {
-//                     if (!res.headersSent) {
-//                          await context.close();
-//                          res.status(500).json({ success: false, message: "Captcha not found" });
-//                     }
-//                 }
-//             }
-//         }, 3000);
-
-//     } catch (err) {
-//         if (!res.headersSent) {
-//             await context.close();
-//             res.status(500).json({ success: false, message: "Connection failed" });
-//         }
-//     }
-// });
-
 
 app.post("/login", async (req, res) => {
     const { regNo, pwd, captcha } = req.body;
@@ -248,22 +163,28 @@ app.post("/login", async (req, res) => {
         if (error) {
             const msg = await error.textContent();
             await context.close();
+            delete pendingCaptcha[regNo];
             return res.status(401).json({ success: false, message: msg.trim() });
         }
 
         const cookies = await context.cookies();
         const token = uuidv4();
         
-        // Save session
-        userSessions[token] = { regNo, cookies };
+        // Save session with a timestamp for cleanup
+        userSessions[token] = { 
+            regNo, 
+            context, 
+            cookies,
+            createdAt: Date.now() // Track when this was created
+        };
         
-        // CLEANUP: Close browser immediately to save RAM
-        await context.close();
+        // Remove from pending, but DO NOT close context
         delete pendingCaptcha[regNo];
 
         res.json({ success: true, token, message: "Login Successful" });
     } catch (err) {
         if(session?.context) await session.context.close();
+        delete pendingCaptcha[regNo];
         res.status(500).json({ success: false, message: "Login Error" });
     }
 });
@@ -279,50 +200,116 @@ app.post("/currentSemCredits", useClient, cached('credits', Scrapers.getCredits,
 app.post("/facultyList", useClient, cached('faculty', Scrapers.getFaculty, 86400));
 app.post("/courseMap", useClient, cached('faculty', Scrapers.getFaculty, 86400)); // Reuses same data
 
-// Attendance (Cache 10m)
-app.post("/attendance", useClient, cached('att', Scrapers.getAttendance, 600));
-app.post("/subjectWiseAttendance", useClient, cached('att', Scrapers.getAttendance, 600)); // Reuses same data
-app.post("/hourWiseAttendance", useClient, cached('att_hour', Scrapers.getHourWise, 600));
+
+app.post("/subjectWiseAttendance", useClient, cached('att', Scrapers.getAttendance, 0)); // Reuses same data
+app.post("/hourWiseAttendance", useClient, cached('att_hour', Scrapers.getHourWise, 0));
 
 // Marks & Grades (Cache 1h)
-app.post("/internalMarks", useClient, cached('marks', Scrapers.getInternalMarks, 3600));
-app.post("/ciaWiseInternalMarks", useClient, cached('marks', Scrapers.getInternalMarks, 3600)); // Reuses same data
-app.post("/semGrades", useClient, cached('grades', Scrapers.getGrades, 86400));
-app.post("/sgpa", useClient, cached('grades', Scrapers.getGrades, 86400)); // Reuses same data
-app.post("/cgpa", useClient, cached('grades', Scrapers.getGrades, 86400)); // Reuses same data
-app.post("/examSchedule", useClient, cached('exams', Scrapers.getExamSchedule, 86400));
+app.post("/internalMarks", useClient, cached('marks', Scrapers.getInternalMarks, 0));
+app.post("/ciaWiseInternalMarks", useClient, cached('marks', Scrapers.getInternalMarks, 0)); // Reuses same data
+app.post("/semGrades", useClient, cached('grades', Scrapers.getGrades, 0));
+app.post("/examSchedule", useClient, cached('exams', Scrapers.getExamSchedule, 0));
 
-// Finance (Cache 1h)
-// Note: We use a custom handler here to split the large Dues object
-app.post("/sastraDue", useClient, cached('dues', async (client) => {
-    const data = await Scrapers.getDues(client);
-    return { sastraDue: data.sastra.list, totalDue: data.sastra.total };
-}, 3600));
 
-app.post("/hostelDue", useClient, cached('dues', async (client) => {
-    const data = await Scrapers.getDues(client); // Will hit cache if 'dues' exists
-    return { hostelDue: data.hostel.list, totalDue: data.hostel.total };
-}, 3600));
+// ---------- SASTRA DUE (No Cache) ----------
+app.post("/sastraDue", useClient, async (req, res) => {
+    try {
+        const data = await Scrapers.getDues(req.client);
+        res.json({ 
+            success: true, 
+            sastraDue: data.sastra.list, 
+            totalDue: data.sastra.total,
+            source: 'network' 
+        });
+    } catch (err) {
+        res.status(500).json({ success: false, message: "Failed to fetch Sastra due", error: err.message });
+    }
+});
 
-app.post("/feeCollections", useClient, cached('dues', async (client) => {
-    const data = await Scrapers.getDues(client);
-    return { feeCollections: data.history };
-}, 3600));
+// ---------- HOSTEL DUE (No Cache) ----------
+app.post("/hostelDue", useClient, async (req, res) => {
+    try {
+        const data = await Scrapers.getDues(req.client);
+        res.json({ 
+            success: true, 
+            hostelDue: data.hostel.list, 
+            totalDue: data.hostel.total,
+            source: 'network' 
+        });
+    } catch (err) {
+        res.status(500).json({ success: false, message: "Failed to fetch Hostel due", error: err.message });
+    }
+});
+
+// ---------- FEE COLLECTIONS (No Cache) ----------
+app.post("/feeCollections", useClient, async (req, res) => {
+    try {
+        const data = await Scrapers.getDues(req.client);
+        res.json({ 
+            success: true, 
+            feeCollections: data.history,
+            source: 'network' 
+        });
+    } catch (err) {
+        res.status(500).json({ success: false, message: "Failed to fetch fee collections", error: err.message });
+    }
+});
 
 // Profile Pic (Streaming - No Cache needed in RAM, maybe browser cache)
-app.post("/profilePic", useClient, async (req, res) => {
-    try {
-        // Try to find image URL from profile cache first
-        let imgUrl = "usermanager/image.jsp"; // Fallback
-        
-        const profileCache = cache.get(`${req.regNo}_profile`);
-        if (profileCache?.imgUrl) imgUrl = profileCache.imgUrl;
+app.post("/profilePic", async (req, res) => {
+    const { token } = req.body;
+    const session = userSessions[token];
 
-        const response = await req.client.get(imgUrl, { responseType: 'stream' });
-        res.setHeader('Content-Type', 'image/jpeg');
-        response.data.pipe(res);
+    if (!session || !session.context) {
+        return res.status(401).json({ success: false, message: "Session expired" });
+    }
+
+    const { context } = session;
+    let page;
+
+    try {
+        page = await context.newPage();
+        
+        // Navigate and wait for the network to be completely quiet
+        await page.goto("https://webstream.sastra.edu/sastrapwi/usermanager/home.jsp", { 
+            waitUntil: "networkidle", 
+            timeout: 15000 
+        });
+
+        const imgSelector = '#form01 img';
+        
+        // 1. Wait for the element to be attached and visible
+        const profileImg = page.locator(imgSelector);
+        await profileImg.waitFor({ state: 'visible', timeout: 5000 });
+
+        // 2. Optimization: Ensure the image has actual dimensions (loaded)
+        await page.waitForFunction((sel) => {
+            const img = document.querySelector(sel);
+            return img && img.complete && img.naturalWidth > 0;
+        }, imgSelector);
+
+        // 3. Take screenshot with 'animations: disabled' to prevent stability errors
+        const buffer = await profileImg.screenshot({ 
+            type: "png",
+            animations: "disabled" 
+        });
+
+        res.setHeader("Content-Type", "image/png");
+        res.send(buffer);
+
     } catch (err) {
-        res.status(404).send("Image not found");
+        console.error("Profile Pic Error:", err.message);
+        res.status(500).json({ success: false, message: "Failed to capture stable image" });
+    } finally {
+        if (page) await page.close(); 
+        
+        // Close context to save RAM as we discussed
+        try {
+            await context.close();
+            session.context = null;
+        } catch (e) {
+            console.error("Error closing context:", e);
+        }
     }
 });
 
@@ -380,7 +367,26 @@ app.post("/bunk", useClient, async (req, res) => {
 // 📝 FORM ROUTES
 // ==========================================
 
-app.post("/leaveHistory", useClient, cached('leave', Scrapers.getLeaveHistory, 60));
+app.post("/leaveHistory", useClient, async (req, res) => {
+    try {
+        // Call the scraper directly using the client from middleware
+        const data = await Scrapers.getLeaveHistory(req.client);
+        
+        // Return fresh data every time
+        res.json({ 
+            success: true, 
+            leaveHistory: data.leaveHistory,
+            source: 'network' 
+        });
+    } catch (err) {
+        console.error("Leave History Route Error:", err.message);
+        res.status(500).json({ 
+            success: false, 
+            message: "Failed to fetch leave history", 
+            error: err.message 
+        });
+    }
+});
 
 app.post("/grievances", useClient, async (req, res) => {
     if (req.body.dryRun) {

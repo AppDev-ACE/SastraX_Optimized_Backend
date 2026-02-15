@@ -12,7 +12,7 @@ export const Scrapers = {
         const $ = cheerio.load(data);
         const items = $(".navcenter01 li").map((i, el) => $(el).text().trim()).get();
         
-        // While we are here, get the image URL to cache it
+        // Look for the image exactly where your old code looked
         let imgRel = $('#form01 img').attr('src') || $('img[alt="Photo not found"]').attr('src');
 
         return {
@@ -21,7 +21,7 @@ export const Scrapers = {
             course: items[2],
             dept: items[3],
             semester: items[4],
-            imgUrl: imgRel // Return this to use in profilePic route
+            imgUrl: imgRel // This will be passed to profilePic
         };
     },
 
@@ -69,24 +69,46 @@ export const Scrapers = {
 
     // --- ATTENDANCE & TIMETABLE ---
     getAttendance: async (client) => {
-        const { data } = await client.get("resource/StudentDetailsResources.jsp?resourceid=7");
-        const $ = cheerio.load(data);
-        const table = $("table").last();
-        
-        const subjects = table.find("tbody tr").slice(2, -2).map((i, el) => {
-            const cols = $(el).find("td");
-            return {
-                code: clean($(cols[0]).text()),
-                name: clean($(cols[1]).text()),
-                total: clean($(cols[2]).text()),
-                present: clean($(cols[3]).text()),
-                absent: clean($(cols[4]).text()),
-                percent: clean($(cols[5]).text())
-            };
-        }).get();
+        try {
+            const { data } = await client.get("resource/StudentDetailsResources.jsp?resourceid=7");
+            const $ = cheerio.load(data);
+            
+            // 1. Use YOUR working selector: The First Table
+            const table = $("table").first();
+            
+            if (!table.length) {
+                return { overall: "0", subjects: [], error: "Table not found" };
+            }
 
-        const overall = clean(table.find("tbody tr").last().prev().find("td").eq(4).text());
-        return { overall, subjects };
+            const rows = table.find("tbody tr");
+            
+            // 2. Use YOUR working logic for Overall Attendance
+            // "rows.length - 2" gets the "Total" row
+            // ".eq(4)" gets the percentage column
+            const lastDataRow = rows.eq(rows.length - 2);
+            const overall = clean(lastDataRow.find("td").eq(4).text());
+
+            // 3. Extract Subject Details (The rows in between header and footer)
+            // We skip the first 2 rows (Headers) and the last 2 rows (Total/Credits)
+            const subjects = rows.slice(2, rows.length - 2).map((i, el) => {
+                const cols = $(el).find("td");
+                return {
+                    code: clean($(cols[0]).text()),
+                    name: clean($(cols[1]).text()),
+                    type: clean($(cols[2]).text()), // Sometimes 'Theory'/'Lab' is here
+                    totalHrs: clean($(cols[2]).text()), // Adjust index if needed based on real UI
+                    present: clean($(cols[3]).text()),
+                    absent: clean($(cols[4]).text()),
+                    percent: clean($(cols[5]).text())
+                };
+            }).get();
+
+            return { overall: overall || "N/A", subjects };
+
+        } catch (err) {
+            console.error("Attendance Error:", err.message);
+            return { overall: "Error", subjects: [] };
+        }
     },
 
     getHourWise: async (client) => {
@@ -233,19 +255,61 @@ export const Scrapers = {
 
     // --- FORMS & APPLICATIONS ---
     getLeaveHistory: async (client) => {
-        const { data } = await client.get("academy/studentLeaveHistory.jsp");
+    try {
+        const { data } = await client.get("academy/HostelStudentLeaveApplication.jsp");
         const $ = cheerio.load(data);
-        return $("table").last().find("tbody tr").slice(1).map((i, el) => {
-            const cols = $(el).find("td");
-            return {
-                applied: clean($(cols[0]).text()),
-                from: clean($(cols[1]).text()),
-                to: clean($(cols[2]).text()),
-                reason: clean($(cols[3]).text()),
-                status: clean($(cols[4]).text())
-            };
-        }).get();
-    },
+        
+        // Check for session timeout
+        if (data.includes("User Login")) throw new Error("Session Expired");
+
+        // 1. Find ALL tables on the page
+        const tables = $("table");
+        let targetTable = null;
+
+        // 2. Look for the table that specifically contains the leave headers
+        tables.each((i, el) => {
+            const text = $(el).text();
+            if (text.includes("Leave Type") && text.includes("From Date")) {
+                targetTable = $(el);
+                return false; // Found it, break loop
+            }
+        });
+
+        if (!targetTable) {
+            return { leaveHistory: "No records found" };
+        }
+
+        const leaveHistory = [];
+
+        // 3. Use the exact attribute from your Puppeteer code: [onclick]
+        // This is the most reliable way to identify data rows vs header rows
+        const rows = targetTable.find("tr[onclick]");
+
+        rows.each((i, row) => {
+            const columns = $(row).find("td");
+            
+            if (columns.length >= 7) {
+                leaveHistory.push({
+                    sno: $(columns[0]).text().trim(),
+                    leaveType: $(columns[1]).text().trim(),
+                    fromDate: $(columns[2]).text().trim(),
+                    toDate: $(columns[3]).text().trim(),
+                    noOfDays: $(columns[4]).text().trim(),
+                    reason: $(columns[5]).text().trim(),
+                    status: $(columns[6]).text().trim()
+                });
+            }
+        });
+
+        return { 
+            leaveHistory: leaveHistory.length > 0 ? leaveHistory : "No records found" 
+        };
+
+    } catch (err) {
+        console.error("Leave Scrape Error:", err.message);
+        throw err;
+    }
+},
 
     submitGrievance: async (client, payload) => {
         // Optimized form submission
