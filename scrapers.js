@@ -161,8 +161,8 @@ export const Scrapers = {
                 sem: clean($(cols[0]).text()),
                 code: clean($(cols[2]).text()),
                 name: clean($(cols[3]).text()),
+                credit: clean($(cols[5]).text()),
                 grade: clean($(cols[6]).text()),
-                result: clean($(cols[7]).text())
             };
         }).get();
 
