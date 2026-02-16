@@ -205,10 +205,49 @@ app.post("/subjectWiseAttendance", useClient, cached('att', Scrapers.getAttendan
 app.post("/hourWiseAttendance", useClient, cached('att_hour', Scrapers.getHourWise, 0));
 
 // Marks & Grades (Cache 1h)
-app.post("/internalMarks", useClient, cached('marks', Scrapers.getInternalMarks, 0));
-app.post("/ciaWiseInternalMarks", useClient, cached('marks', Scrapers.getInternalMarks, 0)); // Reuses same data
-app.post("/semGrades", useClient, cached('grades', Scrapers.getGrades, 0));
-app.post("/examSchedule", useClient, cached('exams', Scrapers.getExamSchedule, 0));
+// --- MARKS & GRADES (Direct Fetch / No Cache) ---
+
+// --- MARKS (Direct Network Fetch) ---
+
+app.post("/internalMarks", useClient, async (req, res) => {
+    try {
+        // Fetch both, but return only 'marks'
+        const { marks } = await Scrapers.getInternalMarks(req.client);
+        res.json({ success: true, internalMarks: marks });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+app.post("/ciaWiseInternalMarks", useClient, async (req, res) => {
+    try {
+        // Fetch both, but return only 'ciaWise'
+        const { ciaWise } = await Scrapers.getInternalMarks(req.client);
+        res.json({ success: true, ciaWiseInternalMarks: ciaWise });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+app.post("/semGrades", useClient, async (req, res) => {
+    try {
+        // Scrapers.getGrades returns { semGrades, sgpa, cgpa }
+        const data = await Scrapers.getGrades(req.client);
+        res.json({ success: true, ...data });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// 4. Exam Schedule
+app.post("/examSchedule", useClient, async (req, res) => {
+    try {
+        const examSchedule = await Scrapers.getExamSchedule(req.client);
+        res.json({ success: true, examSchedule });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
 
 
 // ---------- SASTRA DUE (No Cache) ----------
@@ -385,6 +424,21 @@ app.post("/leaveHistory", useClient, async (req, res) => {
             message: "Failed to fetch leave history", 
             error: err.message 
         });
+    }
+});
+
+app.post("/leaveApplication", useClient, async (req, res) => {
+    // Optional: Dry Run to test payload without submitting
+    if (req.body.dryRun) {
+        return res.json({ success: true, message: "Dry Run: Payload received", data: req.body });
+    }
+
+    const result = await Scrapers.submitLeave(req.client, req.body);
+    
+    if (result.success) {
+        res.json(result);
+    } else {
+        res.status(400).json(result);
     }
 });
 

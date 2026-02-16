@@ -183,22 +183,25 @@ export const Scrapers = {
         const { data } = await client.get("resource/StudentDetailsResources.jsp?resourceid=22");
         const $ = cheerio.load(data);
         
+        // Table 1: Total Internal Marks
         const marks = $("table").first().find("tbody tr").slice(2).map((i, el) => {
             const cols = $(el).find("td");
             return {
                 code: clean($(cols[0]).text()),
                 name: clean($(cols[1]).text()),
-                marks: clean($(cols[2]).text())
+                totalCIAMarks: clean($(cols[2]).text()) // Renamed to match frontend expectation
             };
         }).get();
 
+        // Table 2: Detailed CIA-Wise Marks
         const ciaWise = $("table").eq(1).find("tbody tr").slice(2).map((i, el) => {
             const cols = $(el).find("td");
             return {
-                code: clean($(cols[0]).text()),
-                name: clean($(cols[1]).text()),
+                subjectCode: clean($(cols[0]).text()),
+                subjectName: clean($(cols[1]).text()),
                 component: clean($(cols[2]).text()),
-                mark: clean($(cols[3]).text()) + "/" + clean($(cols[4]).text())
+                marksObtained: clean($(cols[3]).text()),
+                maxMarks: clean($(cols[4]).text())
             };
         }).get();
 
@@ -308,6 +311,79 @@ export const Scrapers = {
     } catch (err) {
         console.error("Leave Scrape Error:", err.message);
         throw err;
+    }
+},
+
+    submitLeave: async (client, payload) => {
+    const TARGET_URL = "academy/HostelStudentLeaveApplication.jsp";
+
+    try {
+        // 1. GET page to fetch hidden tokens
+        console.log("🔹 Step 1: Fetching form...");
+        const getRes = await client.get(TARGET_URL);
+        const $ = cheerio.load(getRes.data);
+        
+        const params = new URLSearchParams();
+
+        // 2. Scrape ALL hidden inputs (Critical for JSP)
+        $('input[type="hidden"]').each((i, el) => {
+            const name = $(el).attr('name');
+            const value = $(el).attr('value');
+            if (name) params.append(name, value || '');
+        });
+
+        // 3. Format Date strictly to dd/MM/yyyy
+        // If payload.fromDate is "2026-02-15", this fixes it to "15/02/2026"
+        const cleanDate = (d) => d.split(' ')[0].replace(/-/g, '/').split('/').reverse().join('/');
+        
+        // Use the function above OR ensure your frontend sends dd/MM/yyyy
+        // For debugging, let's log exactly what we are sending
+        console.log(`🔹 Sending Dates: From ${payload.fromDate} To ${payload.toDate}`);
+
+        params.append('txtLeaveType', payload.leaveType); 
+        params.append('txtFromDate', payload.fromDate); 
+        params.append('txtToDate', payload.toDate);
+        params.append('txtNoofDays', payload.noOfDays);
+        params.append('txtReason', payload.reason);
+        
+        // CRITICAL: The submit button itself must be sent
+        params.append('btSubmit', 'Submit'); 
+
+        // 4. POST the data
+        console.log("🔹 Step 2: Submitting...");
+        const { data } = await client.post(TARGET_URL, params, {
+            headers: {
+                "Content-Type": "application/x-www-form-urlencoded",
+                "Referer": "https://webstream.sastra.edu/sastrapwi/academy/HostelStudentLeaveApplication.jsp",
+                "Origin": "https://webstream.sastra.edu"
+            }
+        });
+
+        // 5. DEBUGGING THE RESPONSE
+        const $response = cheerio.load(data);
+        
+        // Attempt to find the specific error message on the page
+        const uiError = $response(".ui-state-error").text().trim();
+        const alertError = data.match(/alert\('([^']+)'\)/); // Regex to catch JS alerts
+        const title = $response("title").text();
+
+        console.log("--- 🔴 SERVER RESPONSE DEBUG 🔴 ---");
+        if (uiError) console.log("UI Error:", uiError);
+        if (alertError) console.log("JS Alert:", alertError[1]);
+        if (!uiError && !alertError) console.log("Page Title:", title);
+        
+        // Check for success
+        if (data.includes("Saved Successfully") || data.includes("Applied Successfully")) {
+            return { success: true, message: "Leave applied successfully" };
+        } else {
+            // Return the specific error found
+            const specificError = uiError || (alertError ? alertError[1] : "Unknown Error - Check Logs");
+            return { success: false, message: specificError };
+        }
+
+    } catch (error) {
+        console.error("❌ Network Error:", error.message);
+        return { success: false, message: "Connection Failed" };
     }
 },
 
