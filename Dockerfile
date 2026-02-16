@@ -2,7 +2,7 @@
 # Base Image: Official Playwright image (Includes Node.js + Browsers)
 # We use 'jammy' (Ubuntu 22.04) which is stable and widely supported.
 # -----------------------------------------------------------------------------
-FROM mcr.microsoft.com/playwright:v1.49.1-jammy
+FROM mcr.microsoft.com/playwright:v1.58.2-jammy
 
 # 1. Set the working directory inside the container
 WORKDIR /app
