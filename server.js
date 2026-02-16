@@ -6,7 +6,7 @@ import NodeCache from "node-cache";
 
 import { createFastClient } from "./apiClient.js";
 import { Scrapers } from "./scrapers.js";
-import { messMenuData, pyqLinks, subjectAliasMap, subjectMap } from "./staticData.js";
+import { messMenuData, pyqLinks, subjectAliasMap, subjectMap, materialLinks } from "./staticData.js";
 
 const app = express();
 app.use(cors());
@@ -352,13 +352,11 @@ app.post("/profilePic", async (req, res) => {
     }
 });
 
-// ==========================================
-// 🧠 LOGIC ROUTES (Tier 3 - Zero Latency)
-// ==========================================
 
 app.get("/messMenu", (req, res) => res.json(messMenuData.boys));
 app.get("/messMenuGirls", (req, res) => res.json(messMenuData.girls));
 app.get("/pyq", (req, res) => res.json(pyqLinks));
+app.get("/materials", (req, res) => res.json(materialLinks));
 
 app.post("/chatbot", (req, res) => {
     const msg = (req.body.message || "").toLowerCase();

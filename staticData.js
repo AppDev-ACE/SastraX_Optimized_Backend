@@ -715,3 +715,222 @@ export const messMenuData = {
   "signals & systems": "ss",
   "ss": "ss"
   };
+
+  export const materialLinks = [
+       //SEM 1
+      {
+        dept : "alldept",
+        url : "https://drive.google.com/drive/folders/1hsEFhsA27jZWcD76U3-dnijXcphFoYYZ"
+      },
+
+       //SEM 2
+      {
+        dept : "alldept",
+        url : "https://drive.google.com/drive/folders/1hsEFhsA27jZWcD76U3-dnijXcphFoYYZ"
+      },
+
+      //SEM 3
+      {
+        dept : "aerospace3",
+        url : "https://drive.google.com/drive/folders/1AIchr0eSIq27tmshWsrXZPi3HBbhmbOG"
+      },
+      {
+        dept : "biotech3",
+        url : "https://drive.google.com/drive/folders/1-3qFdM2VU40JXa7lFZqsw69q4gu-luH4"
+      },
+      {
+        dept : "cse3",
+        url : "https://drive.google.com/drive/folders/1JWzazYiV3ry7IeadbJs5xCnrlOIHetB1"
+      },
+      {
+        dept : "civil3",
+        url : "https://drive.google.com/drive/u/0/folders/1_LZnVyPq6pbLw7eri7kiD3_wixyrTxfe"
+      },
+      {
+        dept : "iot3",
+        url : "https://drive.google.com/drive/u/0/folders/1JWzazYiV3ry7IeadbJs5xCnrlOIHetB1"
+      },
+      {
+        dept : "ict3",
+        url : "https://drive.google.com/drive/folders/1TyQOKdgIqizo4p6YZ-0v75CjBvl1VWkC"
+      },
+      {
+        dept : "it3",
+        url : "https://drive.google.com/drive/folders/1TyQOKdgIqizo4p6YZ-0v75CjBvl1VWkC"
+      },
+      {
+        dept : "ece3",
+        url : "https://drive.google.com/drive/u/0/folders/19U7wFLtcwEg3JOc98JzoHeAQQwYWwlrf"
+      },
+      {
+        dept : "eee3",
+        url : "https://drive.google.com/drive/u/0/folders/19RmmtxCWEYgO4p2Ym962wFUrwCGB1XeB"
+      },
+      {
+        dept : "eie3",
+        url : "https://drive.google.com/drive/folders/1rc8Y4MgMX9e5yt1RnKCCisorxM9hN2Al"
+      }, 
+      {
+        dept : "mechanical3",
+        url : "https://drive.google.com/drive/u/0/folders/1BA9RYB2UU86K7vOvuLkzDwr2NUKCVDTf"
+      }, 
+      {
+        dept : "mechatronics3",
+        url : "https://drive.google.com/drive/folders/1emJWtfXo91SsiQx0Bfn5OIlLCZynhVrW"
+      },
+
+      //SEM 4
+      {
+        dept : "aerospace4",
+        url : "https://drive.google.com/drive/folders/1Gmem7ecw2Tr-wHWyJGLECSjt-w6_guI0"
+      },
+      {
+        dept : "biotech4",
+        url : "https://drive.google.com/drive/folders/1Nl3vIiQqnlwIaUURJORV3bSPuHmhtffv"
+      },
+      {
+        dept : "cse4",
+        url : "https://drive.google.com/drive/u/0/folders/1Cf5eIhCt_lXO6jLu6ox0ixEHSOML3S1R"
+      },
+      {
+        dept : "civil4",
+        url : "https://drive.google.com/drive/u/0/folders/1_RNdBi7G_mXyfKcWLDfYut8RJbQadLOu"
+      },
+      {
+        dept : "iot4",
+        url : "https://drive.google.com/drive/u/0/folders/1t35bYgiEnu84OMtbeWPmiIKi9ysDE-D-"
+      },
+      {
+        dept : "ict4",
+        url : "https://drive.google.com/drive/folders/1CD4Mm7xGd5PrAFO-MyJKReoIdcqrozI6"
+      },
+      {
+        dept : "it4",
+        url : "https://drive.google.com/drive/folders/1CD4Mm7xGd5PrAFO-MyJKReoIdcqrozI6"
+      },
+      {
+        dept : "ece4",
+        url : "https://drive.google.com/drive/folders/1GEVNQAs2rv0AUcTLol5Rz-91MyMir1SO"
+      },
+      {
+        dept : "eee4",
+        url : "https://drive.google.com/drive/u/0/folders/17ZN2RFfzT4-e5m6xnHVDzdmKIyK4TNVR"
+      },
+      {
+        dept : "eie4",
+        url : "https://drive.google.com/drive/folders/1XqLBdnWxeWjjh6mHLNE1je4NcDNpCoIr"
+      }, 
+      {
+        dept : "mechanical4",
+        url : "https://drive.google.com/drive/u/0/folders/1-wo9s1lpvthH-I2agHN7QNpMFlySwwnd"
+      }, 
+      {
+        dept : "mechatronics4",
+        url : "https://drive.google.com/drive/folders/1ol-nloz1eXbNkWSg9Rwei0LJDgX6zocI"
+      },
+
+      //SEM 5
+      {
+        dept : "aerospace5",
+        url : "https://drive.google.com/drive/folders/1Avk-hLvmB5aeuoxJPENe-dpyShLm5vW9"
+      },
+      {
+        dept : "cse5",
+        url : "https://drive.google.com/drive/folders/1Zcu-2IdTx_5r8_EuSUGWai4bSjvym--L"
+      },
+      {
+        dept : "civil5",
+        url : "https://drive.google.com/drive/u/0/folders/1nl6O97RL9LKXt1mvZv8mLRLc0WXPx1UA"
+      },
+      {
+        dept : "ict5",
+        url : "https://drive.google.com/drive/folders/1Wr0ksIrG_AgHWwXSQMNHheZWdLDp5aG5"
+      },
+      {
+        dept : "it5",
+        url : "https://drive.google.com/drive/folders/1Wr0ksIrG_AgHWwXSQMNHheZWdLDp5aG5"
+      },
+      {
+        dept : "ece5",
+        url : "https://drive.google.com/drive/folders/1pxDYkjYFcLRYy0K4pzWsr6YrjYMy_xCw"
+      },
+      {
+        dept : "eee5",
+        url : "https://drive.google.com/drive/folders/1p-jZ7TPJCqrCubTSj9N_-3WfwyaF1T5K"
+      }, 
+      {
+        dept : "mechanical5",
+        url : "https://drive.google.com/drive/u/0/folders/1wp73DjhCIgGvCs2kgLzaTsUJoSqs5Svu"
+      }, 
+      {
+        dept : "mechatronics5",
+        url : "https://drive.google.com/drive/folders/1CvLsC6Ay1tS32pQdM-HBIo2UnSRFW6o4"
+      },
+
+      //SEM 6
+      {
+        dept : "aerospace6",
+        url : "https://drive.google.com/drive/folders/1Cxmvu_tmD5Pve3g57KaQ2-JX10OfvTRq"
+      },
+      {
+        dept : "cse6",
+        url : "https://drive.google.com/drive/folders/1hzgn3MGGIBkNpr7TqDUUnSJRv9toDxE3"
+      },
+      {
+        dept : "civil6",
+        url : "https://drive.google.com/drive/folders/1epvlc9E8i8NqkYZEHhZloOL3IYWpc-M4"
+      },
+      {
+        dept : "ict6",
+        url : "https://drive.google.com/drive/folders/1s54p3v3kEgvd-lpXXRQKhOtzya_fp5tI"
+      },
+      {
+        dept : "it6",
+        url : "https://drive.google.com/drive/folders/19SoaCs4aRKLBaUI0itAQFXnFcEfu8wW_"
+      },
+      {
+        dept : "ece6",
+        url : "https://drive.google.com/drive/folders/1fS0bW_RS_NFFMbjIDxgiVttbHqqeR3Uu"
+      },
+      {
+        dept : "eee6",
+        url : "https://drive.google.com/drive/folders/1-VZtrWBZLxy_fOUU1uNEnV0GK-k1kVGF"
+      }, 
+      {
+        dept : "mechanical6",
+        url : "https://drive.google.com/drive/u/0/folders/1L3WHKSokMaebWWbjrPLnf4hLVXMuLFDG"
+      }, 
+      {
+        dept : "mechatronics6",
+        url : "https://drive.google.com/drive/folders/1F3IKAbREGn3DGTFbvPzzyHoeERSzBDfK"
+      },
+
+
+      //SEM 7
+      {
+        dept : "cse7",
+        url : "https://drive.google.com/drive/folders/1k5y9UtD4NkKwMrBC4dxOkgU0iS6TOgbi"
+      },
+      {
+        dept : "civil7",
+        url : "https://drive.google.com/drive/folders/1CPP61yEqWmZn4FgAR8mo-BsBIyVE9cx8"
+      },
+      {
+        dept : "ict7",
+        url : "https://drive.google.com/drive/folders/1Avw33hD17gwuw5_vaWY5OKkoARVgJvI8"
+      },
+      {
+        dept : "mechanical7",
+        url : "https://drive.google.com/drive/u/0/folders/13KpWIWpvJ_H4IlsbvxK5KNJWqX1YVS_w"
+      }, 
+      {
+        dept : "mechatronics7",
+        url : "https://drive.google.com/drive/folders/19dQA70v4aem5TRZbiBC1ZuuQa7OMjVkS"
+      },
+
+      //LAW
+      {
+        dept : "law",
+        url : "https://drive.google.com/drive/u/0/folders/1yckeIjA2mTwTkjNm19VoCqdlx6KtYBWC"
+      },
+  ];
