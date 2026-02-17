@@ -295,6 +295,63 @@ app.post("/feeCollections", useClient, async (req, res) => {
 });
 
 // Profile Pic (Streaming - No Cache needed in RAM, maybe browser cache)
+// app.post("/profilePic", async (req, res) => {
+//     const { token } = req.body;
+//     const session = userSessions[token];
+
+//     if (!session || !session.context) {
+//         return res.status(401).json({ success: false, message: "Session expired" });
+//     }
+
+//     const { context } = session;
+//     let page;
+
+//     try {
+//         page = await context.newPage();
+        
+//         // Navigate and wait for the network to be completely quiet
+//         await page.goto("https://webstream.sastra.edu/sastrapwi/usermanager/home.jsp", { 
+//             waitUntil: "networkidle", 
+//             timeout: 15000 
+//         });
+
+//         const imgSelector = '#form01 img';
+        
+//         // 1. Wait for the element to be attached and visible
+//         const profileImg = page.locator(imgSelector);
+//         await profileImg.waitFor({ state: 'visible', timeout: 5000 });
+
+//         // 2. Optimization: Ensure the image has actual dimensions (loaded)
+//         await page.waitForFunction((sel) => {
+//             const img = document.querySelector(sel);
+//             return img && img.complete && img.naturalWidth > 0;
+//         }, imgSelector);
+
+//         // 3. Take screenshot with 'animations: disabled' to prevent stability errors
+//         const buffer = await profileImg.screenshot({ 
+//             type: "png",
+//             animations: "disabled" 
+//         });
+
+//         res.setHeader("Content-Type", "image/png");
+//         res.send(buffer);
+
+//     } catch (err) {
+//         console.error("Profile Pic Error:", err.message);
+//         res.status(500).json({ success: false, message: "Failed to capture stable image" });
+//     } finally {
+//         if (page) await page.close(); 
+        
+//         // Close context to save RAM as we discussed
+//         try {
+//             await context.close();
+//             session.context = null;
+//         } catch (e) {
+//             console.error("Error closing context:", e);
+//         }
+//     }
+// });
+
 app.post("/profilePic", async (req, res) => {
     const { token } = req.body;
     const session = userSessions[token];
@@ -308,47 +365,63 @@ app.post("/profilePic", async (req, res) => {
 
     try {
         page = await context.newPage();
-        
-        // Navigate and wait for the network to be completely quiet
-        await page.goto("https://webstream.sastra.edu/sastrapwi/usermanager/home.jsp", { 
-            waitUntil: "networkidle", 
-            timeout: 15000 
+
+        // 1. Navigate to the page
+        await page.goto("https://webstream.sastra.edu/sastrapwi/usermanager/home.jsp", {
+            waitUntil: "domcontentloaded", // Faster than networkidle
+            timeout: 15000
         });
 
-        const imgSelector = '#form01 img';
+        // 2. SMART SELECTOR: Based on your screenshot, the real image is inside #form01
+        // and its URL always contains "SImage".
+        // This line makes Playwright WAIT until the real photo URL is swapped in.
+        // It prevents grabbing the "loading..." icon.
+        const imgSelector = '#form01 img[src*="SImage"]';
         
-        // 1. Wait for the element to be attached and visible
-        const profileImg = page.locator(imgSelector);
-        await profileImg.waitFor({ state: 'visible', timeout: 5000 });
+        try {
+            await page.waitForSelector(imgSelector, { state: 'attached', timeout: 8000 });
+        } catch (e) {
+            throw new Error("Profile image never loaded (SImage URL missing)");
+        }
 
-        // 2. Optimization: Ensure the image has actual dimensions (loaded)
-        await page.waitForFunction((sel) => {
-            const img = document.querySelector(sel);
-            return img && img.complete && img.naturalWidth > 0;
-        }, imgSelector);
+        // 3. Extract the Source URL
+        const imageSrc = await page.getAttribute(imgSelector, 'src');
+        if (!imageSrc) throw new Error("Image source is empty");
 
-        // 3. Take screenshot with 'animations: disabled' to prevent stability errors
-        const buffer = await profileImg.screenshot({ 
-            type: "png",
-            animations: "disabled" 
-        });
+        // 4. Fetch the image data INSIDE the browser
+        // This handles the relative path ("../../resource/...") and cookies automatically.
+        const base64Data = await page.evaluate(async (src) => {
+            const response = await fetch(src);
+            const blob = await response.blob();
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                // Returns string like "data:image/jpeg;base64,..."
+                reader.onloadend = () => resolve(reader.result); 
+                reader.onerror = reject;
+                reader.readAsDataURL(blob);
+            });
+        }, imageSrc);
 
-        res.setHeader("Content-Type", "image/png");
-        res.send(buffer);
+        // 5. Convert Base64 back to binary buffer
+        const matches = base64Data.match(/^data:(.+);base64,(.+)$/);
+        if (!matches || matches.length !== 3) {
+            throw new Error("Invalid image data received");
+        }
+
+        const contentType = matches[1]; // e.g., 'image/jpeg'
+        const dataBuffer = Buffer.from(matches[2], 'base64');
+
+        res.setHeader("Content-Type", contentType);
+        res.send(dataBuffer);
 
     } catch (err) {
         console.error("Profile Pic Error:", err.message);
-        res.status(500).json({ success: false, message: "Failed to capture stable image" });
+        res.status(500).json({ success: false, message: "Failed to load profile picture" });
     } finally {
-        if (page) await page.close(); 
+        if (page) await page.close();
         
-        // Close context to save RAM as we discussed
-        try {
-            await context.close();
-            session.context = null;
-        } catch (e) {
-            console.error("Error closing context:", e);
-        }
+        // Optional: Close context if you want to kill the session immediately
+        // try { await context.close(); session.context = null; } catch (e) {}
     }
 });
 
@@ -408,7 +481,6 @@ app.post("/leaveHistory", useClient, async (req, res) => {
     try {
         // Call the scraper directly using the client from middleware
         const data = await Scrapers.getLeaveHistory(req.client);
-        
         // Return fresh data every time
         res.json({ 
             success: true, 

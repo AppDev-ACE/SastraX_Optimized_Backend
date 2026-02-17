@@ -257,62 +257,41 @@ export const Scrapers = {
     },
 
     // --- FORMS & APPLICATIONS ---
+    
     getLeaveHistory: async (client) => {
-    try {
-        const { data } = await client.get("academy/HostelStudentLeaveApplication.jsp");
-        const $ = cheerio.load(data);
-        
-        // Check for session timeout
-        if (data.includes("User Login")) throw new Error("Session Expired");
+  try {
+    const { data } = await client.get(
+      "academy/HostelStudentLeaveApplication.jsp"
+    );
 
-        // 1. Find ALL tables on the page
-        const tables = $("table");
-        let targetTable = null;
+    const $ = cheerio.load(data);
+    const leaveHistory = [];
 
-        // 2. Look for the table that specifically contains the leave headers
-        tables.each((i, el) => {
-            const text = $(el).text();
-            if (text.includes("Leave Type") && text.includes("From Date")) {
-                targetTable = $(el);
-                return false; // Found it, break loop
-            }
-        });
+    // ❌ DO NOT use tbody for Axios
+    $("table#StudentLeaveApplciation tbody tr").each((_, row) => {
+      const td = $(row).find("td");
+      if (td.length < 7) return;
 
-        if (!targetTable) {
-            return { leaveHistory: "No records found" };
-        }
+      leaveHistory.push({
+        sno: td.eq(0).text().trim(),
+        leaveType: td.eq(1).text().trim(),
+        fromDate: td.eq(2).text().trim(),
+        toDate: td.eq(3).text().trim(),
+        noOfDays: td.eq(4).text().trim(),
+        reason: td.eq(5).text().trim(),
+        status: td.eq(6).text().trim()
+      });
+    });
 
-        const leaveHistory = [];
+    return { leaveHistory };
 
-        // 3. Use the exact attribute from your Puppeteer code: [onclick]
-        // This is the most reliable way to identify data rows vs header rows
-        const rows = targetTable.find("tr[onclick]");
-
-        rows.each((i, row) => {
-            const columns = $(row).find("td");
-            
-            if (columns.length >= 7) {
-                leaveHistory.push({
-                    sno: $(columns[0]).text().trim(),
-                    leaveType: $(columns[1]).text().trim(),
-                    fromDate: $(columns[2]).text().trim(),
-                    toDate: $(columns[3]).text().trim(),
-                    noOfDays: $(columns[4]).text().trim(),
-                    reason: $(columns[5]).text().trim(),
-                    status: $(columns[6]).text().trim()
-                });
-            }
-        });
-
-        return { 
-            leaveHistory: leaveHistory.length > 0 ? leaveHistory : "No records found" 
-        };
-
-    } catch (err) {
-        console.error("Leave Scrape Error:", err.message);
-        throw err;
-    }
+  } catch (err) {
+    console.error("Leave Scrape Error:", err.message);
+    throw err;
+  }
 },
+
+
 
     submitLeave: async (client, payload) => {
     const TARGET_URL = "academy/HostelStudentLeaveApplication.jsp";
