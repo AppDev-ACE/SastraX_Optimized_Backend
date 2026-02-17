@@ -257,41 +257,6 @@ export const Scrapers = {
     },
 
     // --- FORMS & APPLICATIONS ---
-    
-    getLeaveHistory: async (client) => {
-  try {
-    const { data } = await client.get(
-      "academy/HostelStudentLeaveApplication.jsp"
-    );
-
-    const $ = cheerio.load(data);
-    const leaveHistory = [];
-
-    // ❌ DO NOT use tbody for Axios
-    $("table#StudentLeaveApplciation tbody tr").each((_, row) => {
-      const td = $(row).find("td");
-      if (td.length < 7) return;
-
-      leaveHistory.push({
-        sno: td.eq(0).text().trim(),
-        leaveType: td.eq(1).text().trim(),
-        fromDate: td.eq(2).text().trim(),
-        toDate: td.eq(3).text().trim(),
-        noOfDays: td.eq(4).text().trim(),
-        reason: td.eq(5).text().trim(),
-        status: td.eq(6).text().trim()
-      });
-    });
-
-    return { leaveHistory };
-
-  } catch (err) {
-    console.error("Leave Scrape Error:", err.message);
-    throw err;
-  }
-},
-
-
 
     submitLeave: async (client, payload) => {
     const TARGET_URL = "academy/HostelStudentLeaveApplication.jsp";

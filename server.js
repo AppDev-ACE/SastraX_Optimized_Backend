@@ -477,25 +477,6 @@ app.post("/bunk", useClient, async (req, res) => {
 // 📝 FORM ROUTES
 // ==========================================
 
-app.post("/leaveHistory", useClient, async (req, res) => {
-    try {
-        // Call the scraper directly using the client from middleware
-        const data = await Scrapers.getLeaveHistory(req.client);
-        // Return fresh data every time
-        res.json({ 
-            success: true, 
-            leaveHistory: data.leaveHistory,
-            source: 'network' 
-        });
-    } catch (err) {
-        console.error("Leave History Route Error:", err.message);
-        res.status(500).json({ 
-            success: false, 
-            message: "Failed to fetch leave history", 
-            error: err.message 
-        });
-    }
-});
 
 app.post("/leaveApplication", useClient, async (req, res) => {
     // Optional: Dry Run to test payload without submitting
