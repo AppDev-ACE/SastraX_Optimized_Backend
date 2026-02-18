@@ -331,20 +331,4 @@ export const Scrapers = {
     }
 },
 
-    submitGrievance: async (client, payload) => {
-        // Optimized form submission
-        const params = new URLSearchParams();
-        params.append('cmbGrievanceType', payload.grievanceType);
-        params.append('cmbGrievanceCategory', payload.grievanceCategory);
-        params.append('txtSubject', payload.grievanceSubject);
-        params.append('txtSubjectDescription', payload.grievanceDetail);
-        
-        // Handle hidden fields if necessary by fetching GET first (omitted for speed if standard)
-        
-        const { data } = await client.post("academy/StudentsGrievances.jsp", params);
-        if(data.includes("success") || data.includes("Saved Successfully")) {
-            return { success: true, message: "Submitted successfully" };
-        }
-        return { success: false, message: "Submission failed or needs manual check" };
-    }
 };
