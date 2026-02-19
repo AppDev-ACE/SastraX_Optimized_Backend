@@ -260,59 +260,65 @@ app.post("/refresh-captcha", async (req, res) => {
 });
 
 app.post("/refresh-login", async (req, res) => {
-    const { token, captcha } = req.body;
-    const refreshSession = pendingRefresh[token];
+  const { token, captcha } = req.body;
+  const refreshSession = pendingRefresh[token];
 
-    if (!refreshSession) {
-        return res.status(400).json({ 
-            success: false, 
-            message: "Refresh session timed out. Try again." 
-        });
+  if (!refreshSession) {
+    return res.status(400).json({
+      success: false,
+      message: "Refresh session expired"
+    });
+  }
+
+  const { page, context, regNo, pwd } = refreshSession;
+
+  try {
+    // 🔐 AUTO-FILL STORED CREDENTIALS
+    await page.fill("#txtRegNumber", regNo);
+    await page.fill("#txtPwd", pwd);
+    await page.fill("#answer", captcha);
+
+    await Promise.all([
+      page.click('input[type="button"]'),
+      page.waitForLoadState("networkidle")
+    ]);
+
+    // ✅ STRONG SUCCESS CHECK
+    const url = page.url();
+    if (url.includes("login") || url.includes("index")) {
+      throw new Error("Invalid captcha or refresh login failed");
     }
 
-    const { page, context } = refreshSession;
+    // Extract cookies
+    const newCookies = await context.cookies();
 
-    try {
-        // 1. Fill Captcha & Click Login
-        await page.fill("#answer", captcha);
-        
-        // Wait for navigation (Login success or failure)
-        await Promise.all([
-            page.click('input[type="button"]'), // The login button
-            page.waitForLoadState("networkidle") // Wait for page to settle
-        ]);
+    // 🔍 Verify cookies are authenticated
+    const testClient = createFastClient(newCookies);
+    const testResp = await testClient.get("usermanager/home.jsp");
 
-        // 2. Check for Login Errors (Invalid Captcha, etc.)
-        const errorElement = await page.$(".ui-state-error");
-        if (errorElement) {
-            const errorMsg = await errorElement.textContent();
-            await context.close();
-            delete pendingRefresh[token];
-            return res.status(401).json({ success: false, message: errorMsg.trim() });
-        }
-
-        // 3. SUCCESS: Extract New Cookies
-        const newCookies = await context.cookies();
-        
-        // 4. Update the Main Session Store
-        // Now, any subsequent request (like /profile, /attendance) using this token
-        // will use these FRESH cookies.
-        if (userSessions[token]) {
-            userSessions[token].cookies = newCookies;
-        }
-
-        // 5. Cleanup
-        await context.close();
-        delete pendingRefresh[token];
-
-        res.json({ success: true, message: "Session refreshed successfully" });
-
-    } catch (error) {
-        await context.close();
-        delete pendingRefresh[token];
-        console.error("Refresh Login Error:", error);
-        res.status(500).json({ success: false, message: "Login failed during refresh" });
+    if (testResp.data.includes("User Login")) {
+      throw new Error("Session not authenticated after refresh");
     }
+
+    // ✅ Update session cookies
+    userSessions[token].cookies = newCookies;
+
+    delete pendingRefresh[token];
+
+    res.json({
+      success: true,
+      message: "Session refreshed successfully"
+    });
+
+  } catch (err) {
+    await context.close();
+    delete pendingRefresh[token];
+
+    res.status(401).json({
+      success: false,
+      message: err.message
+    });
+  }
 });
 
 // ==========================================
