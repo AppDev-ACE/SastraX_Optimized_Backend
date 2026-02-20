@@ -143,11 +143,131 @@ app.post("/captcha", async (req, res) => {
 });
 
 
+// app.post("/login", async (req, res) => {
+//     const { regNo, pwd, captcha } = req.body;
+//     const session = pendingCaptcha[regNo];
+
+//     if (!session) return res.status(400).json({ message: "Captcha expired" });
+
+//     try {
+//         const { page, context } = session;
+//         await page.fill("#txtRegNumber", regNo);
+//         await page.fill("#txtPwd", pwd);
+//         await page.fill("#answer", captcha);
+
+//         await Promise.all([
+//             page.click('input[type="button"]'),
+//             page.waitForLoadState('domcontentloaded')
+//         ]);
+
+//         const error = await page.$('.ui-state-error');
+//         if (error) {
+//             const msg = await error.textContent();
+//             await context.close();
+//             delete pendingCaptcha[regNo];
+//             return res.status(401).json({ success: false, message: msg.trim() });
+//         }
+
+//         const cookies = await context.cookies();
+//         const token = uuidv4();
+        
+//         // Save session with a timestamp for cleanup
+//         userSessions[token] = { 
+//             regNo, 
+//             pwd,
+//             context, 
+//             cookies,
+//             createdAt: Date.now() // Track when this was created
+//         };
+        
+//         // Remove from pending, but DO NOT close context
+//         delete pendingCaptcha[regNo];
+
+//         res.json({ success: true, token, message: "Login Successful" });
+//     } catch (err) {
+//         if(session?.context) await session.context.close();
+//         delete pendingCaptcha[regNo];
+//         res.status(500).json({ success: false, message: "Login Error" });
+//     }
+// });
+
+// REFRESH
+// app.post("/refresh-captcha", async (req, res) => {
+//     const { token } = req.body;
+//     const session = userSessions[token];
+
+//     if (!session || !session.pwd) {
+//         return res.status(401).json({ 
+//             success: false, 
+//             message: "Session expired or password not saved. Please login manually." 
+//         });
+//     }
+
+//     try {
+//         const context = await browser.newContext();
+//         const page = await context.newPage();
+
+//         // OPTIMIZATION: Block heavy resources to load page faster
+//         await page.route('**/*.{css,woff,woff2,js,jpg,jpeg,gif,webp}', route => {
+//             const url = route.request().url();
+//             // Allow the captcha image and the main page, block everything else
+//             if (url.includes('Captcha') || url === BASE || url.includes('jquery')) {
+//                 route.continue();
+//             } else {
+//                 route.abort();
+//             }
+//         });
+
+//         // 3. Navigate with a timeout
+//         try {
+//             await page.goto(BASE, { 
+//                 waitUntil: 'domcontentloaded', 
+//                 timeout: 10000 // 10s timeout for navigation
+//             });
+//         } catch (e) {
+//             await context.close();
+//             return res.status(504).json({ error: "University server timeout" });
+//         }
+        
+//         // Wait for captcha image
+//         const captchaSelector = '#imgCaptcha';
+//         await page.waitForSelector(captchaSelector, { state: 'visible', timeout: 5000 });
+
+//         await page.waitForFunction((selector) => {
+//             const img = document.querySelector(selector);
+//             return img && img.complete && img.naturalWidth > 0;
+//         }, captchaSelector, { timeout: 5000 });
+
+//         // 6. Take Screenshot
+//         const element = page.locator(captchaSelector);
+//         const buffer = await element.screenshot();
+
+//         // Store this specific page context mapped to the USER TOKEN
+//         pendingRefresh[token] = { 
+//             page, 
+//             context, 
+//             regNo: session.regNo, 
+//             pwd: session.pwd // Retrieve pwd from session store
+//         };
+
+//         res.set("Content-Type", "image/png");
+//         res.send(buffer);
+
+//     } catch (err) {
+//         console.error("Refresh Captcha Error:", err);
+//         res.status(500).json({ success: false, message: "Failed to load captcha" });
+//     }
+// });
+
+
 app.post("/login", async (req, res) => {
     const { regNo, pwd, captcha } = req.body;
     const session = pendingCaptcha[regNo];
 
     if (!session) return res.status(400).json({ message: "Captcha expired" });
+
+    // Clear the auto-kill timer since the user is completing the flow
+    clearTimeout(session.timeoutId);
 
     try {
         const { page, context } = session;
@@ -171,159 +291,261 @@ app.post("/login", async (req, res) => {
         const cookies = await context.cookies();
         const token = uuidv4();
         
-        // Save session with a timestamp for cleanup
+        // Save session with credentials and cookies, but NO active context
         userSessions[token] = { 
             regNo, 
-            context, 
+            pwd, 
             cookies,
-            pwd: pwd,
-            createdAt: Date.now() // Track when this was created
+            createdAt: Date.now()
         };
         
-        // Remove from pending, but DO NOT close context
+        // CRITICAL: Close context immediately to free RAM
+        await context.close();
         delete pendingCaptcha[regNo];
 
         res.json({ success: true, token, message: "Login Successful" });
     } catch (err) {
-        if(session?.context) await session.context.close();
+        if (session?.context) {
+            try { await session.context.close(); } catch (e) {}
+        }
         delete pendingCaptcha[regNo];
         res.status(500).json({ success: false, message: "Login Error" });
     }
 });
 
-// REFRESH
-app.post("/refresh-captcha", async (req, res) => {
+app.post("/profilePic", async (req, res) => {
     const { token } = req.body;
     const session = userSessions[token];
 
-    if (!session || !session.pwd) {
-        return res.status(401).json({ 
-            success: false, 
-            message: "Session expired or password not saved. Please login manually." 
+    if (!session || !session.cookies) {
+        return res.status(401).json({ success: false, message: "Session expired" });
+    }
+
+    let context;
+    try {
+        // Spin up a temporary headless context using the authenticated cookies
+        context = await browser.newContext();
+        await context.addCookies(session.cookies);
+        const page = await context.newPage();
+        
+        await page.goto("https://webstream.sastra.edu/sastrapwi/usermanager/home.jsp", { 
+            waitUntil: "networkidle", 
+            timeout: 15000 
         });
+
+        const imgSelector = '#form01 img';
+        const profileImg = page.locator(imgSelector);
+        await profileImg.waitFor({ state: 'visible', timeout: 5000 });
+
+        await page.waitForFunction((sel) => {
+            const img = document.querySelector(sel);
+            return img && img.complete && img.naturalWidth > 0;
+        }, imgSelector);
+
+        const buffer = await profileImg.screenshot({ 
+            type: "png",
+            animations: "disabled" 
+        });
+
+        // Immediately close the context to free memory
+        await context.close();
+        
+        res.setHeader("Content-Type", "image/png");
+        res.send(buffer);
+
+    } catch (err) {
+        if (context) {
+            try { await context.close(); } catch (e) {}
+        }
+        console.error("Profile Pic Error:", err.message);
+        res.status(500).json({ success: false, message: "Failed to capture stable image" });
+    }
+});
+
+
+
+app.post("/refresh-captcha", async (req, res) => {
+    const session = userSessions[req.body.token];
+    
+    // Ensure session exists and has a saved password
+    if (!session || !session.pwd) {
+        return res.status(401).json({ message: "Session expired or password missing" });
     }
 
     try {
         const context = await browser.newContext();
         const page = await context.newPage();
-
-        // OPTIMIZATION: Block heavy resources to load page faster
-        await page.route('**/*.{css,woff,woff2,js,jpg,jpeg,gif,webp}', route => {
-            const url = route.request().url();
-            // Allow the captcha image and the main page, block everything else
-            if (url.includes('Captcha') || url === BASE || url.includes('jquery')) {
-                route.continue();
-            } else {
-                route.abort();
-            }
-        });
-
-        // 3. Navigate with a timeout
-        try {
-            await page.goto(BASE, { 
-                waitUntil: 'domcontentloaded', 
-                timeout: 10000 // 10s timeout for navigation
-            });
-        } catch (e) {
-            await context.close();
-            return res.status(504).json({ error: "University server timeout" });
-        }
         
-        // Wait for captcha image
-        const captchaSelector = '#imgCaptcha';
-        await page.waitForSelector(captchaSelector, { state: 'visible', timeout: 5000 });
-
-        await page.waitForFunction((selector) => {
-            const img = document.querySelector(selector);
+        // Navigate and wait for captcha to load
+        await page.goto(BASE, { waitUntil: "domcontentloaded", timeout: 10000 });
+        await page.waitForSelector("#imgCaptcha", { state: 'visible', timeout: 5000 });
+        
+        // Ensure image has actual dimensions before screenshot
+        await page.waitForFunction(() => {
+            const img = document.querySelector('#imgCaptcha');
             return img && img.complete && img.naturalWidth > 0;
-        }, captchaSelector, { timeout: 5000 });
+        }, { timeout: 5000 });
 
-        // 6. Take Screenshot
-        const element = page.locator(captchaSelector);
-        const buffer = await element.screenshot();
+        const buffer = await page.locator("#imgCaptcha").screenshot();
 
-        // Store this specific page context mapped to the USER TOKEN
-        pendingRefresh[token] = { 
-            page, 
+        // Prevent memory leak: Auto-kill this context if user abandons the login
+        const timeoutId = setTimeout(async () => {
+            if (pendingRefresh[req.body.token]) {
+                try {
+                    await pendingRefresh[req.body.token].context.close();
+                } catch (e) {
+                    // Ignore close errors
+                }
+                delete pendingRefresh[req.body.token];
+                console.log(`Cleaned up abandoned refresh session for token: ${req.body.token}`);
+            }
+        }, 45000); // 45 seconds to solve captcha
+
+        // Save context and page so /refresh-login can use them
+        pendingRefresh[req.body.token] = { 
             context, 
-            regNo: session.regNo, 
-            pwd: session.pwd // Retrieve pwd from session store
+            page, 
+            timeoutId 
         };
 
         res.set("Content-Type", "image/png");
         res.send(buffer);
 
-    } catch (err) {
-        console.error("Refresh Captcha Error:", err);
-        res.status(500).json({ success: false, message: "Failed to load captcha" });
+    } catch (e) {
+        console.error("Refresh Captcha Error:", e.message);
+        res.status(500).json({ message: "Failed to load captcha" });
     }
 });
+
+
+// app.post("/refresh-login", async (req, res) => {
+//   const { token, captcha } = req.body;
+//   const refreshSession = pendingRefresh[token];
+
+//   if (!refreshSession) {
+//     return res.status(400).json({
+//       success: false,
+//       message: "Refresh session expired"
+//     });
+//   }
+
+//   const { page, context, regNo, pwd } = refreshSession;
+
+//   try {
+//     // 🔐 AUTO-FILL STORED CREDENTIALS
+//     await page.fill("#txtRegNumber", regNo);
+//     await page.fill("#txtPwd", pwd);
+//     await page.fill("#answer", captcha);
+
+//     await Promise.all([
+//       page.click('input[type="button"]'),
+//       page.waitForLoadState("networkidle")
+//     ]);
+
+//     // ✅ STRONG SUCCESS CHECK
+//     const url = page.url();
+//     if (url.includes("login") || url.includes("index")) {
+//       throw new Error("Invalid captcha or refresh login failed");
+//     }
+
+//     // Extract cookies
+//     const newCookies = await context.cookies();
+
+//     // 🔍 Verify cookies are authenticated
+//     const testClient = createFastClient(newCookies);
+//     const testResp = await testClient.get("usermanager/home.jsp");
+
+//     if (testResp.data.includes("User Login")) {
+//       throw new Error("Session not authenticated after refresh");
+//     }
+
+//     // ✅ Update session cookies
+//     userSessions[token].cookies = newCookies;
+
+//     delete pendingRefresh[token];
+
+//     res.json({
+//       success: true,
+//       message: "Session refreshed successfully"
+//     });
+
+//   } catch (err) {
+//     await context.close();
+//     delete pendingRefresh[token];
+
+//     res.status(401).json({
+//       success: false,
+//       message: err.message
+//     });
+//   }
+// });
+
 
 app.post("/refresh-login", async (req, res) => {
-  const { token, captcha } = req.body;
-  const refreshSession = pendingRefresh[token];
+    const { token, captcha } = req.body;
+    const refresh = pendingRefresh[token];
+    const session = userSessions[token];
 
-  if (!refreshSession) {
-    return res.status(400).json({
-      success: false,
-      message: "Refresh session expired"
-    });
-  }
-
-  const { page, context, regNo, pwd } = refreshSession;
-
-  try {
-    // 🔐 AUTO-FILL STORED CREDENTIALS
-    await page.fill("#txtRegNumber", regNo);
-    await page.fill("#txtPwd", pwd);
-    await page.fill("#answer", captcha);
-
-    await Promise.all([
-      page.click('input[type="button"]'),
-      page.waitForLoadState("networkidle")
-    ]);
-
-    // ✅ STRONG SUCCESS CHECK
-    const url = page.url();
-    if (url.includes("login") || url.includes("index")) {
-      throw new Error("Invalid captcha or refresh login failed");
+    if (!refresh || !session) {
+        return res.status(400).json({ message: "Refresh session expired. Please request a new captcha." });
     }
 
-    // Extract cookies
-    const newCookies = await context.cookies();
+    // Clear the auto-kill timer since the user is completing the flow
+    clearTimeout(refresh.timeoutId);
 
-    // 🔍 Verify cookies are authenticated
-    const testClient = createFastClient(newCookies);
-    const testResp = await testClient.get("usermanager/home.jsp");
+    try {
+        const { page, context } = refresh;
 
-    if (testResp.data.includes("User Login")) {
-      throw new Error("Session not authenticated after refresh");
+        // Auto-fill stored credentials and the user's new captcha
+        await page.fill("#txtRegNumber", session.regNo);
+        await page.fill("#txtPwd", session.pwd);
+        await page.fill("#answer", captcha);
+
+        // Click submit
+        await page.click('input[type="button"]');
+
+        // Wait for successful redirect OR an error message to appear
+        await page.waitForFunction(() => {
+            const url = window.location.href;
+            const err = document.querySelector('.ui-state-error');
+            return (!url.includes("login") && !url.includes("index")) || err;
+        }, { timeout: 10000 });
+
+        const error = await page.$('.ui-state-error');
+        if (error) {
+            const msg = await error.textContent();
+            throw new Error(msg.trim());
+        }
+
+        // Success: Extract authenticated cookies and update session
+        userSessions[token].cookies = await context.cookies();
+
+        // Clean up the browser context to free RAM
+        await context.close();
+        delete pendingRefresh[token];
+
+        res.json({ success: true, message: "Session refreshed successfully" });
+
+    } catch (e) {
+        // Clean up on failure
+        if (refresh.context) {
+            try {
+                await refresh.context.close();
+            } catch (err) {}
+        }
+        delete pendingRefresh[token];
+
+        res.status(401).json({ message: e.message || "Refresh failed" });
     }
-
-    // ✅ Update session cookies
-    userSessions[token].cookies = newCookies;
-
-    delete pendingRefresh[token];
-
-    res.json({
-      success: true,
-      message: "Session refreshed successfully"
-    });
-
-  } catch (err) {
-    await context.close();
-    delete pendingRefresh[token];
-
-    res.status(401).json({
-      success: false,
-      message: err.message
-    });
-  }
 });
+
+
 
 // ==========================================
 // ⚡ ACADEMIC ROUTES (Tier 2 - Axios)
 // ==========================================
+
+
 
 // Profile (Cache 24h)
 app.post("/profile", useClient, cached('profile', Scrapers.getProfile, 86400));
@@ -427,63 +649,6 @@ app.post("/feeCollections", useClient, async (req, res) => {
 });
 
 // Profile Pic (Streaming - No Cache needed in RAM, maybe browser cache)
-app.post("/profilePic", async (req, res) => {
-    const { token } = req.body;
-    const session = userSessions[token];
-
-    if (!session || !session.context) {
-        return res.status(401).json({ success: false, message: "Session expired" });
-    }
-
-    const { context } = session;
-    let page;
-
-    try {
-        page = await context.newPage();
-        
-        // Navigate and wait for the network to be completely quiet
-        await page.goto("https://webstream.sastra.edu/sastrapwi/usermanager/home.jsp", { 
-            waitUntil: "networkidle", 
-            timeout: 15000 
-        });
-
-        const imgSelector = '#form01 img';
-        
-        // 1. Wait for the element to be attached and visible
-        const profileImg = page.locator(imgSelector);
-        await profileImg.waitFor({ state: 'visible', timeout: 5000 });
-
-        // 2. Optimization: Ensure the image has actual dimensions (loaded)
-        await page.waitForFunction((sel) => {
-            const img = document.querySelector(sel);
-            return img && img.complete && img.naturalWidth > 0;
-        }, imgSelector);
-
-        // 3. Take screenshot with 'animations: disabled' to prevent stability errors
-        const buffer = await profileImg.screenshot({ 
-            type: "png",
-            animations: "disabled" 
-        });
-
-        res.setHeader("Content-Type", "image/png");
-        res.send(buffer);
-
-    } catch (err) {
-        console.error("Profile Pic Error:", err.message);
-        res.status(500).json({ success: false, message: "Failed to capture stable image" });
-    } finally {
-        if (page) await page.close(); 
-        
-        // Close context to save RAM as we discussed
-        try {
-            await context.close();
-            session.context = null;
-        } catch (e) {
-            console.error("Error closing context:", e);
-        }
-    }
-});
-
 // app.post("/profilePic", async (req, res) => {
 //     const { token } = req.body;
 //     const session = userSessions[token];
@@ -497,65 +662,50 @@ app.post("/profilePic", async (req, res) => {
 
 //     try {
 //         page = await context.newPage();
-
-//         // 1. Navigate to the page
-//         await page.goto("https://webstream.sastra.edu/sastrapwi/usermanager/home.jsp", {
-//             waitUntil: "domcontentloaded", // Faster than networkidle
-//             timeout: 15000
+        
+//         // Navigate and wait for the network to be completely quiet
+//         await page.goto("https://webstream.sastra.edu/sastrapwi/usermanager/home.jsp", { 
+//             waitUntil: "networkidle", 
+//             timeout: 15000 
 //         });
 
-//         // 2. SMART SELECTOR: Based on your screenshot, the real image is inside #form01
-//         // and its URL always contains "SImage".
-//         // This line makes Playwright WAIT until the real photo URL is swapped in.
-//         // It prevents grabbing the "loading..." icon.
-//         const imgSelector = '#form01 img[src*="SImage"]';
+//         const imgSelector = '#form01 img';
         
-//         try {
-//             await page.waitForSelector(imgSelector, { state: 'attached', timeout: 8000 });
-//         } catch (e) {
-//             throw new Error("Profile image never loaded (SImage URL missing)");
-//         }
+//         // 1. Wait for the element to be attached and visible
+//         const profileImg = page.locator(imgSelector);
+//         await profileImg.waitFor({ state: 'visible', timeout: 5000 });
 
-//         // 3. Extract the Source URL
-//         const imageSrc = await page.getAttribute(imgSelector, 'src');
-//         if (!imageSrc) throw new Error("Image source is empty");
+//         // 2. Optimization: Ensure the image has actual dimensions (loaded)
+//         await page.waitForFunction((sel) => {
+//             const img = document.querySelector(sel);
+//             return img && img.complete && img.naturalWidth > 0;
+//         }, imgSelector);
 
-//         // 4. Fetch the image data INSIDE the browser
-//         // This handles the relative path ("../../resource/...") and cookies automatically.
-//         const base64Data = await page.evaluate(async (src) => {
-//             const response = await fetch(src);
-//             const blob = await response.blob();
-//             return new Promise((resolve, reject) => {
-//                 const reader = new FileReader();
-//                 // Returns string like "data:image/jpeg;base64,..."
-//                 reader.onloadend = () => resolve(reader.result); 
-//                 reader.onerror = reject;
-//                 reader.readAsDataURL(blob);
-//             });
-//         }, imageSrc);
+//         // 3. Take screenshot with 'animations: disabled' to prevent stability errors
+//         const buffer = await profileImg.screenshot({ 
+//             type: "png",
+//             animations: "disabled" 
+//         });
 
-//         // 5. Convert Base64 back to binary buffer
-//         const matches = base64Data.match(/^data:(.+);base64,(.+)$/);
-//         if (!matches || matches.length !== 3) {
-//             throw new Error("Invalid image data received");
-//         }
-
-//         const contentType = matches[1]; // e.g., 'image/jpeg'
-//         const dataBuffer = Buffer.from(matches[2], 'base64');
-
-//         res.setHeader("Content-Type", contentType);
-//         res.send(dataBuffer);
+//         res.setHeader("Content-Type", "image/png");
+//         res.send(buffer);
 
 //     } catch (err) {
 //         console.error("Profile Pic Error:", err.message);
-//         res.status(500).json({ success: false, message: "Failed to load profile picture" });
+//         res.status(500).json({ success: false, message: "Failed to capture stable image" });
 //     } finally {
-//         if (page) await page.close();
+//         if (page) await page.close(); 
         
-//         // Optional: Close context if you want to kill the session immediately
-//         // try { await context.close(); session.context = null; } catch (e) {}
+//         // Close context to save RAM as we discussed
+//         try {
+//             await context.close();
+//             session.context = null;
+//         } catch (e) {
+//             console.error("Error closing context:", e);
+//         }
 //     }
 // });
+
 
 
 app.get("/messMenu", (req, res) => res.json(messMenuData.boys));
