@@ -657,6 +657,7 @@ export const messMenuData = {
 
   "cryptography and network security": "cns",
   "cryptography & network security": "cns",
+  "crypto" : "cns",
   "cns": "cns",
 
   "compiler engineering": "compeng",
@@ -682,6 +683,8 @@ export const messMenuData = {
   "cc": "cc",
 
   "full stack application development": "fswad",
+  "full stack" : "fswad",
+  "web" : "fswad",
   "fswad": "fswad",
 
   "internet of things": "iot",
