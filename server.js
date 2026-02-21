@@ -232,32 +232,103 @@ app.post("/captcha", async (req, res) => {
   }
 });
 
+// app.post("/login", async (req, res) => {
+//   const { captchaId, regNo, pwd, captcha } = req.body;
+
+//   const session = pendingCaptcha[captchaId];
+//   if (!session) return res.status(400).json({ message: "Captcha expired" });
+
+//   try {
+//     const { page, context } = session;
+
+//     await page.fill("#txtRegNumber", regNo);
+//     await page.fill("#txtPwd", pwd);
+//     await page.fill("#answer", captcha);
+
+//     await Promise.all([
+//       page.click('input[type="button"]'),
+//       page.waitForLoadState("domcontentloaded")
+//     ]);
+
+//     const error = await page.$(".ui-state-error");
+//     if (error) {
+//       const msg = await error.textContent();
+//       await context.close();
+//       delete pendingCaptcha[captchaId];
+//       return res.status(401).json({ success: false, message: msg.trim() });
+//     }
+
+//     const cookies = await context.cookies();
+//     const token = uuidv4();
+
+//     userSessions[token] = {
+//       regNo,
+//       pwd,
+//       cookies,
+//       createdAt: Date.now()
+//     };
+
+//     await context.close();
+//     delete pendingCaptcha[captchaId];
+
+//     res.json({ success: true, token });
+
+//   } catch (e) {
+//     try { await session.context.close(); } catch {}
+//     delete pendingCaptcha[captchaId];
+//     res.status(500).json({ success: false, message: "Login failed" });
+//   }
+// });
+
+
 app.post("/login", async (req, res) => {
   const { captchaId, regNo, pwd, captcha } = req.body;
 
   const session = pendingCaptcha[captchaId];
-  if (!session) return res.status(400).json({ message: "Captcha expired" });
+  if (!session) {
+    return res.status(400).json({ success: false, message: "Captcha expired" });
+  }
+
+  const { page, context } = session;
 
   try {
-    const { page, context } = session;
-
+    // Fill login form
     await page.fill("#txtRegNumber", regNo);
     await page.fill("#txtPwd", pwd);
     await page.fill("#answer", captcha);
 
+    // Click login
     await Promise.all([
       page.click('input[type="button"]'),
       page.waitForLoadState("domcontentloaded")
     ]);
 
-    const error = await page.$(".ui-state-error");
-    if (error) {
-      const msg = await error.textContent();
+    /**
+     * ⭐ CRITICAL:
+     * Wait for either success OR error
+     */
+    await Promise.race([
+      page.waitForSelector(".navcenter01", { timeout: 7000 }), // success page
+      page.waitForSelector(".ui-state-error", { timeout: 7000 }) // error
+    ]);
+
+    const successEl = await page.$(".navcenter01");
+
+    // ❌ LOGIN FAILED
+    if (!successEl) {
+      const err = await page.$(".ui-state-error");
+      const msg = err ? await err.textContent() : "Invalid credentials / captcha";
+
       await context.close();
       delete pendingCaptcha[captchaId];
-      return res.status(401).json({ success: false, message: msg.trim() });
+
+      return res.status(401).json({
+        success: false,
+        message: msg.trim()
+      });
     }
 
+    // ✅ LOGIN SUCCESS
     const cookies = await context.cookies();
     const token = uuidv4();
 
@@ -268,18 +339,27 @@ app.post("/login", async (req, res) => {
       createdAt: Date.now()
     };
 
+    // Close context to save RAM
     await context.close();
     delete pendingCaptcha[captchaId];
 
-    res.json({ success: true, token });
+    return res.json({
+      success: true,
+      token
+    });
 
   } catch (e) {
-    try { await session.context.close(); } catch {}
+    console.error("Login error:", e.message);
+
+    try { await context.close(); } catch {}
     delete pendingCaptcha[captchaId];
-    res.status(500).json({ success: false, message: "Login failed" });
+
+    return res.status(500).json({
+      success: false,
+      message: "Login failed"
+    });
   }
 });
-
 
 app.post("/profilePic", async (req, res) => {
     const { token } = req.body;

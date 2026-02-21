@@ -238,7 +238,7 @@ export const Scrapers = {
 
         const parseCollections = (html) => {
              const $ = cheerio.load(html);
-             return $("table").first().find("tbody tr").slice(2, -2).map((i, el) => {
+             return $("table").first().find("tbody tr").slice(2, -1).map((i, el) => {
                 const cols = $(el).find("td");
                 return {
                     sem: clean($(cols[0]).text()),
