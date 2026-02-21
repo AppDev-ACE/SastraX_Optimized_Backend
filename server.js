@@ -1,3 +1,4 @@
+import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import { chromium } from "playwright";
@@ -7,6 +8,11 @@ import NodeCache from "node-cache";
 import { createFastClient } from "./apiClient.js";
 import { Scrapers } from "./scrapers.js";
 import { messMenuData, pyqLinks, subjectAliasMap, subjectMap, materialLinks } from "./staticData.js";
+
+import { getSession, saveSession, updateSessionCookies } from "./sessionStore.js";
+
+import dotenv from "dotenv";
+dotenv.config();
 
 const app = express();
 app.use(cors());
@@ -35,16 +41,31 @@ const pendingRefresh = {}; // Token -> { context, page }
 
 // --- MIDDLEWARE: Client Hydration ---
 // Converts Token -> Axios Client
-const useClient = (req, res, next) => {
-    const { token } = req.body;
-    if (!token) return res.status(400).json({ error: "Token required" });
+// const useClient = (req, res, next) => {
+//     const { token } = req.body;
+//     if (!token) return res.status(400).json({ error: "Token required" });
 
-    const session = userSessions[token];
-    if (!session) return res.status(401).json({ error: "Session expired. Login again." });
+//     const session = userSessions[token];
+//     if (!session) return res.status(401).json({ error: "Session expired. Login again." });
 
-    req.client = createFastClient(session.cookies);
-    req.regNo = session.regNo;
-    next();
+//     req.client = createFastClient(session.cookies);
+//     req.regNo = session.regNo;
+//     next();
+// };
+
+const useClient = async (req, res, next) => {
+  const { token } = req.body;
+
+  const session = await getSession(token);
+
+  if (!session)
+    return res.status(401).json({ error: "Session expired" });
+
+  req.client = createFastClient(session.cookies);
+  req.regNo = session.regNo;
+  req.session = session;
+
+  next();
 };
 
 // --- HELPER: Cached Route Handler ---
@@ -71,130 +92,6 @@ const cached = (keySuffix, scraperFn, ttl = 300) => async (req, res) => {
 // 🔐 AUTH ROUTES (Tier 1 - Playwright)
 // ==========================================
 
-// app.post("/captcha", async (req, res) => {
-//     try {
-//         const { regNo } = req.body;
-//         if (!regNo) return res.status(400).send("RegNo required");
-
-//         // 1. Close previous session if it exists to free memory
-//         if (pendingCaptcha[regNo]) {
-//             try {
-//                 await pendingCaptcha[regNo].context.close();
-//             } catch (e) { /* ignore error if already closed */ }
-//         }
-
-//         // 2. Launch a new context
-//         const context = await browser.newContext();
-//         const page = await context.newPage();
-
-//         // OPTIMIZATION: Block heavy resources to load page faster
-//         await page.route('**/*.{css,woff,woff2,js,jpg,jpeg,gif,webp}', route => {
-//             const url = route.request().url();
-//             // Allow the captcha image and the main page, block everything else
-//             if (url.includes('Captcha') || url === BASE || url.includes('jquery')) {
-//                 route.continue();
-//             } else {
-//                 route.abort();
-//             }
-//         });
-
-//         // 3. Navigate with a timeout
-//         try {
-//             await page.goto(BASE, { 
-//                 waitUntil: 'domcontentloaded', 
-//                 timeout: 10000 // 10s timeout for navigation
-//             });
-//         } catch (e) {
-//             await context.close();
-//             return res.status(504).json({ error: "University server timeout" });
-//         }
-
-//         // 4. Wait specifically for the Captcha Image to be visible
-//         const captchaSelector = '#imgCaptcha';
-//         await page.waitForSelector(captchaSelector, { state: 'visible', timeout: 5000 });
-
-//         // 5. CRITICAL: Wait until the image actually has data (naturalWidth > 0)
-//         // This fixes the "blank screenshot" issue
-//         await page.waitForFunction((selector) => {
-//             const img = document.querySelector(selector);
-//             return img && img.complete && img.naturalWidth > 0;
-//         }, captchaSelector, { timeout: 5000 });
-
-//         // 6. Take Screenshot
-//         const element = page.locator(captchaSelector);
-//         const buffer = await element.screenshot();
-        
-//         // Store session for login
-//         pendingCaptcha[regNo] = { context, page, timestamp: Date.now() };
-        
-//         // Send image
-//         res.set('Content-Type', 'image/png');
-//         res.send(buffer);
-
-//     } catch (err) {
-//         console.error("Captcha Error:", err.message);
-//         // Clean up on error
-//         if (pendingCaptcha[regNo]?.context) {
-//             await pendingCaptcha[regNo].context.close();
-//             delete pendingCaptcha[regNo];
-//         }
-//         res.status(500).json({ error: "Failed to load captcha. Try again." });
-//     }
-// });
-
-
-// app.post("/login", async (req, res) => {
-//     const { regNo, pwd, captcha } = req.body;
-//     const session = pendingCaptcha[regNo];
-
-//     if (!session) return res.status(400).json({ message: "Captcha expired" });
-
-//     // Clear the auto-kill timer since the user is completing the flow
-//     clearTimeout(session.timeoutId);
-
-//     try {
-//         const { page, context } = session;
-//         await page.fill("#txtRegNumber", regNo);
-//         await page.fill("#txtPwd", pwd);
-//         await page.fill("#answer", captcha);
-
-//         await Promise.all([
-//             page.click('input[type="button"]'),
-//             page.waitForLoadState('domcontentloaded')
-//         ]);
-
-//         const error = await page.$('.ui-state-error');
-//         if (error) {
-//             const msg = await error.textContent();
-//             await context.close();
-//             delete pendingCaptcha[regNo];
-//             return res.status(401).json({ success: false, message: msg.trim() });
-//         }
-
-//         const cookies = await context.cookies();
-//         const token = uuidv4();
-        
-//         // Save session with credentials and cookies, but NO active context
-//         userSessions[token] = { 
-//             regNo, 
-//             pwd, 
-//             cookies,
-//             createdAt: Date.now()
-//         };
-        
-//         // CRITICAL: Close context immediately to free RAM
-//         await context.close();
-//         delete pendingCaptcha[regNo];
-
-//         res.json({ success: true, token, message: "Login Successful" });
-//     } catch (err) {
-//         if (session?.context) {
-//             try { await session.context.close(); } catch (e) {}
-//         }
-//         delete pendingCaptcha[regNo];
-//         res.status(500).json({ success: false, message: "Login Error" });
-//     }
-// });
 
 app.post("/captcha", async (req, res) => {
   try {
@@ -222,6 +119,13 @@ app.post("/captcha", async (req, res) => {
       createdAt: Date.now()
     };
 
+    setTimeout(async () => {
+        if (pendingCaptcha[captchaId]) {
+            try { await pendingCaptcha[captchaId].context.close(); } catch {}
+            delete pendingCaptcha[captchaId];
+        }
+        }, 60000);
+
     res.json({
       captchaId,
       image: buffer.toString("base64")
@@ -231,54 +135,6 @@ app.post("/captcha", async (req, res) => {
     res.status(500).json({ error: "Captcha load failed" });
   }
 });
-
-// app.post("/login", async (req, res) => {
-//   const { captchaId, regNo, pwd, captcha } = req.body;
-
-//   const session = pendingCaptcha[captchaId];
-//   if (!session) return res.status(400).json({ message: "Captcha expired" });
-
-//   try {
-//     const { page, context } = session;
-
-//     await page.fill("#txtRegNumber", regNo);
-//     await page.fill("#txtPwd", pwd);
-//     await page.fill("#answer", captcha);
-
-//     await Promise.all([
-//       page.click('input[type="button"]'),
-//       page.waitForLoadState("domcontentloaded")
-//     ]);
-
-//     const error = await page.$(".ui-state-error");
-//     if (error) {
-//       const msg = await error.textContent();
-//       await context.close();
-//       delete pendingCaptcha[captchaId];
-//       return res.status(401).json({ success: false, message: msg.trim() });
-//     }
-
-//     const cookies = await context.cookies();
-//     const token = uuidv4();
-
-//     userSessions[token] = {
-//       regNo,
-//       pwd,
-//       cookies,
-//       createdAt: Date.now()
-//     };
-
-//     await context.close();
-//     delete pendingCaptcha[captchaId];
-
-//     res.json({ success: true, token });
-
-//   } catch (e) {
-//     try { await session.context.close(); } catch {}
-//     delete pendingCaptcha[captchaId];
-//     res.status(500).json({ success: false, message: "Login failed" });
-//   }
-// });
 
 
 app.post("/login", async (req, res) => {
@@ -332,12 +188,19 @@ app.post("/login", async (req, res) => {
     const cookies = await context.cookies();
     const token = uuidv4();
 
-    userSessions[token] = {
-      regNo,
-      pwd,
-      cookies,
-      createdAt: Date.now()
-    };
+    // userSessions[token] = {
+    //   regNo,
+    //   pwd,
+    //   cookies,
+    //   createdAt: Date.now()
+    // };
+
+    await saveSession(token, {
+        regNo,
+        pwd,
+        cookies,
+        createdAt: Date.now()
+    });
 
     // Close context to save RAM
     await context.close();
@@ -363,7 +226,7 @@ app.post("/login", async (req, res) => {
 
 app.post("/profilePic", async (req, res) => {
     const { token } = req.body;
-    const session = userSessions[token];
+    const session = await getSession(token);
 
     if (!session || !session.cookies) {
         return res.status(401).json({ success: false, message: "Session expired" });
@@ -413,7 +276,7 @@ app.post("/profilePic", async (req, res) => {
 
 
 app.post("/refresh-captcha", async (req, res) => {
-    const session = userSessions[req.body.token];
+    const session = await getSession(req.body.token);
     
     // Ensure session exists and has a saved password
     if (!session || !session.pwd) {
@@ -466,73 +329,10 @@ app.post("/refresh-captcha", async (req, res) => {
 });
 
 
-// app.post("/refresh-login", async (req, res) => {
-//   const { token, captcha } = req.body;
-//   const refreshSession = pendingRefresh[token];
-
-//   if (!refreshSession) {
-//     return res.status(400).json({
-//       success: false,
-//       message: "Refresh session expired"
-//     });
-//   }
-
-//   const { page, context, regNo, pwd } = refreshSession;
-
-//   try {
-//     // 🔐 AUTO-FILL STORED CREDENTIALS
-//     await page.fill("#txtRegNumber", regNo);
-//     await page.fill("#txtPwd", pwd);
-//     await page.fill("#answer", captcha);
-
-//     await Promise.all([
-//       page.click('input[type="button"]'),
-//       page.waitForLoadState("networkidle")
-//     ]);
-
-//     // ✅ STRONG SUCCESS CHECK
-//     const url = page.url();
-//     if (url.includes("login") || url.includes("index")) {
-//       throw new Error("Invalid captcha or refresh login failed");
-//     }
-
-//     // Extract cookies
-//     const newCookies = await context.cookies();
-
-//     // 🔍 Verify cookies are authenticated
-//     const testClient = createFastClient(newCookies);
-//     const testResp = await testClient.get("usermanager/home.jsp");
-
-//     if (testResp.data.includes("User Login")) {
-//       throw new Error("Session not authenticated after refresh");
-//     }
-
-//     // ✅ Update session cookies
-//     userSessions[token].cookies = newCookies;
-
-//     delete pendingRefresh[token];
-
-//     res.json({
-//       success: true,
-//       message: "Session refreshed successfully"
-//     });
-
-//   } catch (err) {
-//     await context.close();
-//     delete pendingRefresh[token];
-
-//     res.status(401).json({
-//       success: false,
-//       message: err.message
-//     });
-//   }
-// });
-
-
 app.post("/refresh-login", async (req, res) => {
     const { token, captcha } = req.body;
     const refresh = pendingRefresh[token];
-    const session = userSessions[token];
+    const session = await getSession(token);
 
     if (!refresh || !session) {
         return res.status(400).json({ message: "Refresh session expired. Please request a new captcha." });
@@ -566,7 +366,9 @@ app.post("/refresh-login", async (req, res) => {
         }
 
         // Success: Extract authenticated cookies and update session
-        userSessions[token].cookies = await context.cookies();
+        //userSessions[token].cookies = await context.cookies();
+        const newCookies = await context.cookies();
+        await updateSessionCookies(token, newCookies);
 
         // Clean up the browser context to free RAM
         await context.close();
@@ -823,13 +625,6 @@ app.post("/leaveApplication", useClient, async (req, res) => {
     }
 });
 
-app.post("/grievances", useClient, async (req, res) => {
-    if (req.body.dryRun) {
-        return res.json({ success: true, message: "Dry Run: Data valid" });
-    }
-    const result = await Scrapers.submitGrievance(req.client, req.body);
-    res.json(result);
-});
 
 // START SERVER
 const PORT = process.env.PORT || 3000;
