@@ -559,16 +559,20 @@ export const messMenuData = {
   };
   
   export const subjectAliasMap = {
-    "computer organisation": "co",
+  "computer organisation": "co",
   "computer organization": "co",
   "co": "co",
+
+  "artificial intelligence and data science": "aids",
+  "artificial intelligence & data science": "aids",
+  "aids": "aids",
+
+  "digital system design": "dsd",
+  "dsd": "dsd",
 
   "data structures": "ds",
   "data structure": "ds",
   "ds": "ds",
-
-  "digital system design": "dsd",
-  "dsd": "dsd",
 
   "java": "java",
   "java programming": "java",
@@ -620,6 +624,15 @@ export const messMenuData = {
   "artificial intelligence": "ai",
   "ai": "ai",
 
+  "cryptography and network security": "cns",
+  "cryptography & network security": "cns",
+  "crypto" : "cns",
+  "cns": "cns",
+
+  "data communication and networks": "dcn",
+  "data communication": "dcn",
+  "dcn": "dcn",
+
   "computer network": "cn",
   "computer networks": "cn",
   "cn": "cn",
@@ -629,10 +642,6 @@ export const messMenuData = {
 
   "theory of computation": "toc",
   "toc": "toc",
-
-  "artificial intelligence and data science": "aids",
-  "artificial intelligence & data science": "aids",
-  "aids": "aids",
 
   "data warehouse and data mining": "dwdm",
   "data warehouse & data mining": "dwdm",
@@ -654,11 +663,6 @@ export const messMenuData = {
 
   "deep learning essentials": "dle",
   "dle": "dle",
-
-  "cryptography and network security": "cns",
-  "cryptography & network security": "cns",
-  "crypto" : "cns",
-  "cns": "cns",
 
   "compiler engineering": "compeng",
   "compiler design": "compeng",
@@ -709,10 +713,6 @@ export const messMenuData = {
   "computer organisation and architecture": "coa",
   "computer organization and architecture": "coa",
   "coa": "coa",
-
-  "data communication and networks": "dcn",
-  "data communication": "dcn",
-  "dcn": "dcn",
 
   "signals and systems": "ss",
   "signals & systems": "ss",
