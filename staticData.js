@@ -567,6 +567,10 @@ export const messMenuData = {
   "artificial intelligence & data science": "aids",
   "aids": "aids",
 
+  "parallel and distributed system": "pds",
+  "parallel & distributed system": "pds",
+  "pds": "pds",
+
   "digital system design": "dsd",
   "dsd": "dsd",
 
@@ -696,10 +700,6 @@ export const messMenuData = {
 
   "optimization techniques": "ot",
   "ot": "ot",
-
-  "parallel and distributed system": "pds",
-  "parallel & distributed system": "pds",
-  "pds": "pds",
 
   "sensors and actuators": "sensors",
   "sensors": "sensors",
