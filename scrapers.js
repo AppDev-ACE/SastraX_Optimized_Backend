@@ -208,6 +208,28 @@ export const Scrapers = {
         return { marks, ciaWise };
     },
 
+    getSyllabus: async (client) => {
+        const { data } = await client.get("resource/StudentDetailsResources.jsp?resourceid=40");
+        const $ = cheerio.load(data);
+        const BASE = "https://webstream.sastra.edu/sastrapwi/";
+        const syllabus = $("table").first().find("tbody tr").slice(2).map((i, el) => {
+            const cols = $(el).find("td");
+            const anchor = $(cols[3]).find("a");
+            let href = anchor.attr("href");
+            if (href && href.startsWith("..")) {
+                href = BASE + href.replace("../", "");
+            }
+
+            return {
+                code: clean($(cols[0]).text()),
+                name: clean($(cols[1]).text()),
+                syllabusUrl: href
+            };
+        }).get();
+
+        return { syllabus };
+    },
+
     // --- FINANCE (Parallel Fetch) ---
     getDues: async (client) => {
         const [sastraRes, hostelRes, feeCollRes] = await Promise.all([

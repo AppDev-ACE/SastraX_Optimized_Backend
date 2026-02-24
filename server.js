@@ -408,6 +408,15 @@ app.post("/courseMap", useClient, cached('faculty', Scrapers.getFaculty, 86400))
 app.post("/subjectWiseAttendance", useClient, cached('att', Scrapers.getAttendance, 0)); // Reuses same data
 app.post("/hourWiseAttendance", useClient, cached('att_hour', Scrapers.getHourWise, 0));
 
+app.post("/syllabus", useClient, async (req, res) => {
+    try {
+        const { syllabus } = await Scrapers.getSyllabus(req.client);
+        res.json({ success: true, syllabus: syllabus });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 // Marks & Grades (Cache 1h)
 // --- MARKS & GRADES (Direct Fetch / No Cache) ---
 
