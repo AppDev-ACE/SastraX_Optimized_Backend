@@ -208,27 +208,82 @@ export const Scrapers = {
         return { marks, ciaWise };
     },
 
-    getSyllabus: async (client) => {
-        const { data } = await client.get("resource/StudentDetailsResources.jsp?resourceid=40");
-        const $ = cheerio.load(data);
-        const BASE = "https://webstream.sastra.edu/sastrapwi/";
-        const syllabus = $("table").first().find("tbody tr").slice(2).map((i, el) => {
-            const cols = $(el).find("td");
-            const anchor = $(cols[3]).find("a");
-            let href = anchor.attr("href");
-            if (href && href.startsWith("..")) {
-                href = BASE + href.replace("../", "");
-            }
+    // getSyllabus: async (client) => {
+    //     const { data } = await client.get("resource/StudentDetailsResources.jsp?resourceid=40");
+    //     const $ = cheerio.load(data);
+    //     const BASE = "https://webstream.sastra.edu/sastrapwi/";
+    //     const syllabus = $("table").first().find("tbody tr").slice(2).map((i, el) => {
+    //         const cols = $(el).find("td");
+    //         const anchor = $(cols[3]).find("a");
+    //         let href = anchor.attr("href");
+    //         if (href && href.startsWith("..")) {
+    //             href = BASE + href.replace("../", "");
+    //         }
 
-            return {
-                code: clean($(cols[0]).text()),
-                name: clean($(cols[1]).text()),
-                syllabusUrl: href
-            };
-        }).get();
+    //         return {
+    //             code: clean($(cols[0]).text()),
+    //             name: clean($(cols[1]).text()),
+    //             syllabusUrl: href
+    //         };
+    //     }).get();
 
-        return { syllabus };
-    },
+    //     return { syllabus };
+    // },
+
+  getSyllabus: async (client) => {
+  const { data } = await client.get(
+    "resource/StudentDetailsResources.jsp?resourceid=40"
+  );
+
+  const $ = cheerio.load(data);
+
+  const BASE = "https://webstream.sastra.edu/sastrapwi/";
+  const currentPage =
+    BASE + "resource/StudentDetailsResources.jsp?resourceid=40";
+
+  const syllabus = [];
+
+  const rows = $("table").first().find("tbody tr").slice(2);
+
+  for (const el of rows.toArray()) {
+    const cols = $(el).find("td");
+
+    const anchor = $(cols[3]).find("a");
+    let href = anchor.attr("href");
+
+    if (href) href = new URL(href, currentPage).href;
+
+    let pdfBase64 = null;
+
+    if (href) {
+      const pdfRes = await client.get(href, {
+        responseType: "arraybuffer",
+        headers: {
+          Referer: currentPage,
+          Accept: "application/pdf",
+          "User-Agent": "Mozilla/5.0"
+        },
+        maxRedirects: 5,
+        validateStatus: () => true
+      });
+
+      if (pdfRes.status === 200) {
+        pdfBase64 = Buffer.from(pdfRes.data).toString("base64");
+      } else {
+        console.log("PDF failed:", href, pdfRes.status);
+      }
+    }
+
+    syllabus.push({
+      code: clean($(cols[0]).text()),
+      name: clean($(cols[1]).text()),
+      pdf: pdfBase64
+    });
+  }
+
+  return { syllabus };
+},
+    
 
     // --- FINANCE (Parallel Fetch) ---
     getDues: async (client) => {
