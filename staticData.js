@@ -571,6 +571,13 @@ export const messMenuData = {
   };
   
   export const subjectAliasMap = {
+  "mechanical": "mechanical",
+  "mech": "mechanical",
+  "basic mechanical engineering": "mechanical",
+
+  "engineeing mechanics": "mechanics",
+  "mechanics": "mechanics",
+
   "computer organisation and architecture": "coa",
   "computer organization and architecture": "coa",
   "coa": "coa",
@@ -749,10 +756,6 @@ export const messMenuData = {
   "chem": "chemistry",
   "engineering chemistry": "chemistry",
 
-  "mechanical": "mechanical",
-  "mech": "mechanical",
-  "basic mechanical engineering": "mechanical",
-
   "gen ai": "genai",
   "effective communication": "genai",
   "english": "genai",
@@ -762,9 +765,6 @@ export const messMenuData = {
 
   "basic civil engineering": "civil",
   "civil": "civil",
-
-  "engineeing mechanics": "mechanics",
-  "mechanics": "mechanics",
 
   "cpp" : "cpp",
   "c++": "cpp",
