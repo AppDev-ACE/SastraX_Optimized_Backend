@@ -766,11 +766,12 @@ export const messMenuData = {
   "engineeing mechanics": "mechanics",
   "mechanics": "mechanics",
 
+  "cpp" : "cpp",
+  "c++": "cpp",
+
   "c" : "c",
 
-  "cpp" : "cpp",
-  "c++": "cpp"
-  };
+ };
 
   export const materialLinks = [
        //SEM 1
