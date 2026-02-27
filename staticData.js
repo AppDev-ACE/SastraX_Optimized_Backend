@@ -544,7 +544,7 @@ export const messMenuData = {
   "commeng": "https://drive.google.com/drive/folders/1BgPmU1YJFutzST8Cv5QiTbgX5J4H_keT",
   "gc": "https://drive.google.com/drive/folders/1UY9HO2zvEDtC4WkTBvePe-FCTUqQgoCw",
   "nlp": "https://drive.google.com/drive/folders/1BPkfod2sSszTWypImhjS1e30XqnTJY6s",
-  "se": "https://drive.google.com/drive/folders/1mS9g6b-YzpB4uLhjXthptONcZm_glkyM",
+  "sep": "https://drive.google.com/drive/folders/1mS9g6b-YzpB4uLhjXthptONcZm_glkyM",
   "cc": "https://drive.google.com/drive/folders/1i3tN__g9N4Hmv_q-oMLUnVeeVv51IB5i",
   "fswad": "https://drive.google.com/drive/folders/1iFjyCCUmgHLmrIvM58qMX_jcVni5rhtV",
   "iot": "https://drive.google.com/drive/folders/1CJzkMP6tRhuhMsC1gy38KB09nNHqNeA7",
@@ -555,10 +555,26 @@ export const messMenuData = {
   "eie": "https://drive.google.com/drive/folders/19E0xCRx2WM3rMcVHLUdpRrOYktyGSJ59",
   "coa": "https://drive.google.com/drive/folders/1JvMEMQQp1DI_bk4XrTprgZHySn_YNaA_",
   "dcn": "https://drive.google.com/drive/folders/17KnsJA0f4VR7SPK1suLyxicqUEpSt21I",
-  "ss": "https://drive.google.com/drive/folders/1328YXH_UeCqdMi1LJCxLtRLeohdimr-N"
+  "ss": "https://drive.google.com/drive/folders/1328YXH_UeCqdMi1LJCxLtRLeohdimr-N",
+
+  "eee1": "https://drive.google.com/drive/u/0/folders/1G4SasOnTQjafLgtkY-KmPxhagpQp_3Yb",
+  "eie1": "https://drive.google.com/drive/u/0/folders/1v0vtrS7d85jDsQtwr8ZpAzxdwpADlyAx",
+  "physics": "https://drive.google.com/drive/u/0/folders/15G3EZCNy5DLeKu_ou6vf_0gBvDXzSGU0",
+  "mechanical": "https://drive.google.com/drive/u/0/folders/1rW0uNQCQFgQL0wNxpkQAb4ahUuyBQ5Wm",
+  "tc": "https://drive.google.com/drive/u/0/folders/1GCewNw_egdYPperKMZk8Ezn4wZV6LlYj",
+  "genai": "https://drive.google.com/drive/u/0/folders/1YYfP4hjWnbETT2kHKHczj0T8xNqlMqsY",
+  "mechanics": "https://drive.google.com/drive/u/0/folders/1FZ9cujPLbxGYqAEmc-0Y2LQs1rIWkTR6",
+  "cpp": ["https://drive.google.com/drive/u/0/folders/1_DmxiMj4cOhZn2CFcv-rQcKWFEXD2_Tj","https://drive.google.com/drive/u/0/folders/1OAb-snfErSStOEUG0qR7rlOYF4nJvJWv"],
+  "chemistry": "https://drive.google.com/drive/u/0/folders/1cppAsTXYZjCbyOkRvxJU4Z5KWToN4qvZ",
+  "c" : "https://drive.google.com/drive/u/0/folders/1_0wi2IULSk6A6yuf-l4sqSJ9uzeqvY22",
+  "civil": "https://drive.google.com/drive/u/0/folders/1FtxJDcKDOs61NceBD_hKY5c1CPE1zZys"
   };
   
   export const subjectAliasMap = {
+  "computer organisation and architecture": "coa",
+  "computer organization and architecture": "coa",
+  "coa": "coa",
+  
   "computer organisation": "co",
   "computer organization": "co",
   "co": "co",
@@ -626,6 +642,7 @@ export const messMenuData = {
   "discrete" : "discrete",
 
   "artificial intelligence": "ai",
+  "aids": "ai",
   "ai": "ai",
 
   "cryptography and network security": "cns",
@@ -684,8 +701,8 @@ export const messMenuData = {
   "natural language processing": "nlp",
   "nlp": "nlp",
 
-  "software engineering": "se",
-  "se": "se",
+  "software engineering practices": "sep",
+  "sep": "sep",
 
   "cloud computing": "cc",
   "cc": "cc",
@@ -710,13 +727,49 @@ export const messMenuData = {
   "electronic circuits": "eie",
   "eie": "eie",
 
-  "computer organisation and architecture": "coa",
-  "computer organization and architecture": "coa",
-  "coa": "coa",
-
   "signals and systems": "ss",
   "signals & systems": "ss",
-  "ss": "ss"
+  "ss": "ss",
+
+  "basic electrical engineering": "eee1",
+  "electrical": "eee1",
+  "eee": "eee1",
+  "eee1": "eee1",
+
+  "basic electronics engineering": "eie1",
+  "electronics": "eie1",
+  "eie": "eie1",
+  "eie1": "eie1",
+
+  "physics": "physics",
+  "phy":"physics",
+  "engineering physics": "physics",
+
+  "chemistry": "chemistry",
+  "chem": "chemistry",
+  "engineering chemistry": "chemistry",
+
+  "mechanical": "mechanical",
+  "mech": "mechanical",
+  "basic mechanical engineering": "mechanical",
+
+  "gen ai": "genai",
+  "effective communication": "genai",
+  "english": "genai",
+  
+  "technical communication": "tc",
+  "tc": "tc",
+
+  "basic civil engineering": "civil",
+  "civil": "civil",
+
+  "engineeing mechanics": "mechanics",
+  "mechanics": "mechanics",
+
+  "c" : "c",
+
+  "cpp" : "cpp",
+  "c++": "cpp"
   };
 
   export const materialLinks = [
