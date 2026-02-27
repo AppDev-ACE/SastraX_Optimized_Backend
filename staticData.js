@@ -564,19 +564,21 @@ export const messMenuData = {
   "tc": "https://drive.google.com/drive/u/0/folders/1GCewNw_egdYPperKMZk8Ezn4wZV6LlYj",
   "genai": "https://drive.google.com/drive/u/0/folders/1YYfP4hjWnbETT2kHKHczj0T8xNqlMqsY",
   "mechanics": "https://drive.google.com/drive/u/0/folders/1FZ9cujPLbxGYqAEmc-0Y2LQs1rIWkTR6",
-  "cpp": ["https://drive.google.com/drive/u/0/folders/1_DmxiMj4cOhZn2CFcv-rQcKWFEXD2_Tj","https://drive.google.com/drive/u/0/folders/1OAb-snfErSStOEUG0qR7rlOYF4nJvJWv"],
+  "cpp": "https://drive.google.com/drive/u/0/folders/1_DmxiMj4cOhZn2CFcv-rQcKWFEXD2_Tj",
+  "cpp": "https://drive.google.com/drive/u/0/folders/1OAb-snfErSStOEUG0qR7rlOYF4nJvJWv",
   "chemistry": "https://drive.google.com/drive/u/0/folders/1cppAsTXYZjCbyOkRvxJU4Z5KWToN4qvZ",
   "c" : "https://drive.google.com/drive/u/0/folders/1_0wi2IULSk6A6yuf-l4sqSJ9uzeqvY22",
   "civil": "https://drive.google.com/drive/u/0/folders/1FtxJDcKDOs61NceBD_hKY5c1CPE1zZys"
   };
   
   export const subjectAliasMap = {
+  
+  "engineeing mechanics": "mechanics",
+  "mechanics": "mechanics", 
+
   "mechanical": "mechanical",
   "mech": "mechanical",
   "basic mechanical engineering": "mechanical",
-
-  "engineeing mechanics": "mechanics",
-  "mechanics": "mechanics",
 
   "computer organisation and architecture": "coa",
   "computer organization and architecture": "coa",
